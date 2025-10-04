@@ -40,32 +40,53 @@ class Window:
         """Return the covariate data."""
         return self._covariates.copy()
     
-    def submit_forecast(self, forecast: np.ndarray, univariate: bool = False) -> None:
+    def submit_forecast(self, multivariate_forecast: Optional[np.ndarray]=None, univariate_forecast: Optional[np.ndarray] = None) -> None:
         """
         Store forecast and trigger evaluation once for this window.
         
         Args:
-            forecast: Predicted values
-            univariate: Whether this is a univariate forecast (default: False)
+            multivariate_forecast: Predicted values (multivariate forecast)
+            univariate_forecast: Optional univariate forecast for comparison
         """
-        self._forecast = forecast.copy()
-        self._is_univariate = univariate
-        # Trigger evaluation immediately
-        self._evaluation_results = evaluate_metrics(self._target, self._forecast)
+        # Store multivariate forecast
+        self._forecast = multivariate_forecast.copy() if multivariate_forecast is not None else None
+        
+        # Store univariate forecast if provided
+        if univariate_forecast is not None:
+            self._univariate_forecast = univariate_forecast.copy()
+            self._has_univariate = True
+        else:
+            self._has_univariate = False
+        
+        # Trigger evaluation immediately for both forecasts
+        self._evaluation_results = evaluate_metrics(self._target, self._forecast) if self._forecast is not None else None
+        
+        self._univariate_evaluation_results = evaluate_metrics(self._target, self._univariate_forecast) if self._univariate_forecast is not None else None
     
-    def evaluate(self) -> Dict[str, float]:
+    def evaluate(self, forecast_type: str = "multivariate") -> Dict[str, float]:
         """
         Run metrics and return cached results.
+        
+        Args:
+            forecast_type: Type of forecast to evaluate - "multivariate" or "univariate"
         
         Returns:
             Dictionary of evaluation metrics
         """
-        if self._evaluation_results is None:
-            raise ValueError("No forecast submitted yet. Call submit_forecast() first.")
-        
-        results = self._evaluation_results.copy()
-        results['univariate'] = self._is_univariate
-        return results
+        if forecast_type == "multivariate":
+            if self._evaluation_results is None:
+                raise ValueError("No multivariate forecast submitted yet. Call submit_forecast() first.")
+            results = self._evaluation_results.copy()
+            results['univariate'] = False
+            return results
+        elif forecast_type == "univariate":
+            if not self._has_univariate or not hasattr(self, '_univariate_evaluation_results'):
+                raise ValueError("No univariate forecast submitted yet. Call submit_forecast() with univariate_forecast parameter.")
+            results = self._univariate_evaluation_results.copy()
+            results['univariate'] = True
+            return results
+        else:
+            raise ValueError(f"Invalid forecast_type: {forecast_type}. Must be 'multivariate' or 'univariate'")
     
     @property
     def has_forecast(self) -> bool:
@@ -73,6 +94,16 @@ class Window:
         return self._forecast is not None
     
     @property
+    def has_univariate_forecast(self) -> bool:
+        """Check if univariate forecast has been submitted."""
+        return getattr(self, '_has_univariate', False)
+    
+    @property
+    def has_multivariate_forecast(self) -> bool:
+        """Check if multivariate forecast has been submitted."""
+        return self._forecast is not None
+    
+    @property
     def is_univariate(self) -> bool:
-        """Check if the forecast is univariate."""
+        """Check if the primary forecast is univariate."""
         return getattr(self, '_is_univariate', False)

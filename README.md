@@ -1,32 +1,47 @@
 # MUSED-FM
 
-# mused-fm Client Package Design
+A comprehensive multivariate time series forecasting evaluation framework with robust data handling, multiple baseline models, and flexible model integration.
 
 ## Overview
+
 The `mused-fm` client provides iteration and evaluation utilities for the **MUSED-FM multivariate timeseries evaluation dataset**. Users download the dataset from Hugging Face as a `.tar.gz`, extract it, and then interact with it via this package.
 
-Data is structured as:
-- **Benchmark** → container of multiple domains  
-- **Category (Hierarchy)** -> contains multiple domains
-- **Domain (Hierarchy)** → contains multiple datasets  
+### Data Structure
+- **Benchmark** → container of multiple categories  
+- **Category** → contains multiple domains (traditional, collections, sequential, synthetic)
+- **Domain** → contains multiple datasets  
 - **Dataset** → contains multiple parquet files  
 - **Window** → extracted slices from parquet files  
 
-The breakdown of domains, categories and datasets can be found in data/data_hierarchy.json
-
-The client exposes iteration over all levels, and provides methods for forecasting submission and evaluation.
+The breakdown of domains, categories and datasets can be found in `src/musedfm/data/data_hierarchy.json`
 
 ---
 
 ## Directory Layout
 ```
-src/mused_fm/
+src/musedfm/
     data/
-        window.py
-        dataset.py
-        domain.py
-        benchmark.py
-    metrics.py
+        window.py              # Individual forecasting windows
+        dataset.py             # Dataset loading and windowing
+        domain.py              # Domain management
+        category.py            # Category management
+        benchmark.py           # Top-level benchmark container
+        dataset_config.json    # Dataset configuration
+        data_hierarchy.json    # Data organization hierarchy
+        special_loaders/       # Custom data loaders
+            __init__.py
+            open_aq_special.py # OpenAQ air quality data loader
+    baselines/                 # Baseline forecasting models
+        mean_forecast.py
+        historical_inertia.py
+        linear_trend.py
+        exponential_smoothing.py
+        arima_forecast.py
+    metrics.py                 # Evaluation metrics
+    plotting/                  # Visualization utilities
+        plot_forecasts.py
+examples/
+    run_musedfm.py            # Main evaluation script
 ```
 
 ---
@@ -35,103 +50,193 @@ src/mused_fm/
 
 ### 1. Window
 - **Represents a single evaluation unit** (history, target, covariates).
-- Stores ground truth and submitted forecast.
+- Stores ground truth and submitted forecast with univariate/multivariate classification.
 
 **Methods**
-- `history() -> np.ndarray`
-- `target() -> np.ndarray`
-- `covariates() -> np.ndarray`
-- `submit_forecast(forecast: np.ndarray) -> None`  
-  Stores forecast, triggers evaluation once for this window.
+- `history() -> np.ndarray` - Historical time series data
+- `target() -> np.ndarray` - Ground truth forecast targets
+- `covariates() -> np.ndarray` - Additional features for multivariate models
+- `submit_forecast(forecast: np.ndarray, univariate: bool = False) -> None`  
+  Stores forecast and triggers evaluation once for this window.
 - `evaluate() -> dict`  
-  Runs metrics (e.g., `MAPE`) from `metrics.py` and caches results.
+  Runs metrics (MAPE, MAE, RMSE, NMAE) and returns cached results with univariate flag.
+- `is_univariate -> bool` - Check if forecast is univariate
 
 ---
 
 ### 2. Dataset
 - **Collection of windows** (parsed from parquet files).
+- Handles data cleaning, NaN removal, and column validation.
 - Iterable: `for window in dataset`
-- Aggregates results across windows.
 
 **Methods**
 - `__iter__() -> Iterator[Window]`
 - `evaluate() -> dict`  
   Runs evaluation for all windows (delegates to their cached results).
 - `to_results_csv(path: str) -> None`  
-  - Validates all windows have forecasts submitted.  
-  - Collects cached results, computes aggregates, saves CSV.  
-  - **Does not recompute metrics or save forecasts.**
+  Validates all windows have forecasts submitted, collects cached results, computes aggregates, saves CSV.
 
 ---
 
 ### 3. Domain
 - **Encapsulates multiple datasets**.
 - Iterable: `for dataset in domain`
-- Aggregates results across datasets.
 
 **Methods**
 - `__iter__() -> Iterator[Dataset]`
 - `evaluate() -> dict`  
   Runs evaluation across all datasets (cached results only).
-- `to_results_csv(path: str) -> None`  
-  Same semantics as dataset: validate → aggregate → save.
 
 ---
 
 ### 4. Category
-- **A grouping of datasets which have similar data properties The four categories are named based on the tar.gz files: traditional, collections, sequential and synthetic**.
+- **Groups datasets with similar data properties**.
+- Four categories: traditional, collections, sequential, synthetic.
 - Iterable: `for domain in category`
-- Aggregates results across categories.
 
 **Methods**
 - `__iter__() -> Iterator[Domain]`
 - `evaluate() -> dict`  
-  Runs evaluation across all domains in the category ().
-- `to_results_csv(path: str) -> None`  
-  Same semantics as dataset: validate → aggregate → save.
+  Runs evaluation across all domains in the category.
 
 ---
 
-
 ### 5. Benchmark
-- **Top-level container for multiple domains**.
+- **Top-level container for multiple categories**.
 - Simple orchestrator for evaluations and exports.
 
 **Methods**
-- `__iter__() -> Iterator[Domain]`
+- `__iter__() -> Iterator[Category]`
 - `evaluate() -> dict`  
-  Aggregate results across domains (cached results only).
+  Aggregate results across categories (cached results only).
 - `to_results_csv(path: str) -> None`  
-  Validate forecasts, gather results from all domains, write consolidated CSV.
+  Validate forecasts, gather results from all categories, write consolidated CSV.
+
+---
+
+## Baseline Models
+
+The framework includes several baseline forecasting methods:
+
+1. **Mean Forecast** (`MeanForecast`) - Forecasts the mean of historical data
+2. **Historical Inertia** (`HistoricalInertia`) - Uses the last observed value
+3. **Linear Trend** (`LinearTrend`) - Linear trend extrapolation
+4. **Exponential Smoothing** (`ExponentialSmoothing`) - Simple exponential smoothing
+5. **ARIMA** (`ARIMAForecast`) - AutoRegressive Integrated Moving Average model
+6. **Linear Regression** (`LinearRegressionForecast`) - Linear regression with univariate/multivariate capabilities
+
+Most baseline models are **univariate** (use only target series). The **Linear Regression** model can operate in both univariate and multivariate modes.
 
 ---
 
 ## Metrics
-- Defined in `src/mused_fm/metrics.py`
-- Example:
-  ```python
-  def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-      ...
-  ```
-- `Window.evaluate()` calls metrics once and caches results.  
-- Higher-level `evaluate()` methods aggregate cached results.
+
+Defined in `src/musedfm/metrics.py`:
+- **MAPE** - Mean Absolute Percentage Error
+- **MAE** - Mean Absolute Error  
+- **RMSE** - Root Mean Square Error
+- **NMAE** - Normalized Mean Absolute Error
+
+All metrics include robust NaN handling and return appropriate warnings when insufficient data is available.
 
 ---
 
-## Usage Example
+## Usage
+
+### Running the Benchmark
+
+Use the main evaluation script to run all baseline models:
+
+```bash
+# Run all models on all datasets
+uv run examples/run_musedfm.py --models all --plots --output-dir /path/to/results --benchmark-path /path/to/data
+
+# Run specific models
+uv run examples/run_musedfm.py --models mean,arima,linear_regression --output-dir /path/to/results --benchmark-path /path/to/data
+
+# Limit windows per dataset for faster testing
+uv run examples/run_musedfm.py --models all --windows 100 --output-dir /path/to/results --benchmark-path /path/to/data
+
+# Run only the linear regression model (generates both univariate and multivariate forecasts)
+uv run examples/run_musedfm.py --models linear_regression --output-dir /path/to/results --benchmark-path /path/to/data
+```
+
+### Utilizing examples/run_musedfm.py as a template
+
+To add a custom forecasting model:
+
+1. **Create your model class**:
 ```python
-from mused_fm.data import Benchmark
+class MyCustomModel:
+    def __init__(self, param1=1.0, param2=2.0):
+        self.param1 = param1
+        self.param2 = param2
+    
+    def forecast(self, history, covariates, forecast_length):
+        # Your custom forecasting logic here
+        # history: numpy array of historical values
+        # covariates: numpy array of covariate values (can be None)
+        # forecast_length: number of steps to forecast
+        return np.array([np.mean(history) * self.param1] * forecast_length)
+```
+
+2. **Add to the model dictionary** in `examples/run_musedfm.py`:
+```python
+def get_available_models():
+    return {
+        "mean": {"model": MeanForecast(), "univariate": True},
+        "historical_inertia": {"model": HistoricalInertia(), "univariate": True},
+        "linear_trend": {"model": LinearTrend(), "univariate": True},
+        "exponential_smoothing": {"model": ExponentialSmoothing(), "univariate": True},
+        "arima": {"model": ARIMAForecast(order=(1, 1, 1)), "univariate": True},
+        # Add your custom model:
+        "my_custom": {"model": MyCustomModel(param1=1.5, param2=3.0), "univariate": False}
+    }
+```
+
+3. **Run your model**:
+```bash
+uv run examples/run_musedfm.py --models my_custom --output-dir /path/to/results --benchmark-path /path/to/data
+```
+
+### Model Classification
+
+- **Univariate models** (`"univariate": True`): Use only the target time series for forecasting
+- **Multivariate models** (`"univariate": False`): Use both target series and covariates for forecasting
+
+### Programmatic Usage
+
+```python
+from musedfm.data import Benchmark
+from musedfm.baselines.linear_regression import LinearRegressionForecast
 
 benchmark = Benchmark("/path/to/extracted/data")
+
+# Create a model that can do both univariate and multivariate forecasting
+model = LinearRegressionForecast()
 
 for category in benchmark:
     for domain in category:
         for dataset in domain:
             for window in dataset:
-                forecast = my_model.forecast(window.history(), window.covariates())
-                window.submit_forecast(forecast)
+                # Generate multivariate forecast (uses covariates)
+                multivariate_forecast = model.forecast(window.history(), window.covariates(), len(window.target()))
+                
+                # Generate univariate forecast (ignores covariates)
+                univariate_model = LinearRegressionForecast(use_covariates=False)
+                univariate_forecast = univariate_model.forecast(window.history(), None, len(window.target()))
+                
+                # Submit both forecasts
+                window.submit_forecast(multivariate_forecast, univariate_forecast)
+                
+                # Get evaluation results for both
+                multivariate_results = window.evaluate("multivariate")
+                univariate_results = window.evaluate("univariate")
+                
+                print(f"Multivariate MAPE: {multivariate_results['MAPE']:.2f}%")
+                print(f"Univariate MAPE: {univariate_results['MAPE']:.2f}%")
 
-benchmark.evaluate()
+# Export results
 benchmark.to_results_csv("results.csv")
 ```
 
@@ -160,41 +265,58 @@ source .venv/bin/activate  # On Linux/Mac
 uv pip install -e .
 ```
 
-## Testing
+---
 
-### Run Comprehensive Test Suite
-The test suite includes baseline forecasting methods and validates the entire MUSED-FM pipeline:
+## Data Handling Features
 
-```bash
-# Run the comprehensive test
-uv run python test_musedfm.py
+### Robust Data Processing
+- **Automatic NaN handling**: Removes entirely NaN columns and trailing/preceding NaNs
+- **Comma-separated number parsing**: Handles numeric data with comma separators
+- **Column validation**: Updates target/metadata columns when columns are dropped
+- **Special loaders**: Custom data loaders for unique formats (e.g., OpenAQ)
+
+### Dataset Configuration
+- **Flexible column specification**: Supports `INDEX#`, `DYNAMIC:`, `CONTAINS:` formats
+- **Timestamp handling**: Automatic timestamp generation and datetime column combination
+- **Metadata parsing**: Intelligent parsing of metadata column specifications
+
+---
+
+## Output
+
+The framework generates:
+- **Console output**: Real-time progress and model performance summaries
+- **CSV files**: Detailed metrics for each dataset and model
+- **Plots** (optional): Forecast visualizations for analysis
+- **Aggregated results**: Overall performance across all datasets
+
+Example output:
+```
+mean Summary:
+  Total windows: 1000
+  Total time: 5.13s
+  Model type: Univariate
+  Average MAPE: 12.45%
+  Average MAE: 0.0234
+  Average RMSE: 0.0345
+  Average NMAE: 0.1234
+
+linear_regression Summary:
+  Total windows: 1000
+  Total time: 8.45s
+  Model type: Multivariate
+  Average MAPE: 10.23%
+  Average MAE: 0.0198
+  Average RMSE: 0.0289
+  Average NMAE: 0.0987
+
+linear_regression_univariate Summary:
+  Total windows: 1000
+  Total time: 6.12s
+  Model type: Univariate
+  Average MAPE: 11.87%
+  Average MAE: 0.0212
+  Average RMSE: 0.0312
+  Average NMAE: 0.1123
 ```
 
-### Baseline Forecasting Methods
-The test includes several baseline methods:
-
-1. **Mean Forecast**: Forecasts the mean of historical data
-2. **Historical Inertia**: Uses the last observed value (based on [Historical Inertia](https://arxiv.org/pdf/2103.16349))
-3. **ARIMA**: AutoRegressive Integrated Moving Average model
-4. **Linear Trend**: Linear trend extrapolation
-5. **Exponential Smoothing**: Simple exponential smoothing
-
-### Test Structure
-The test suite validates:
-- ✅ Single dataset loading and processing
-- ✅ Domain-level aggregation
-- ✅ Category-level aggregation  
-- ✅ Benchmark-level aggregation
-- ✅ CSV export functionality
-- ✅ All baseline forecasting methods
-
-### Performance Notes
-- Tests are designed to run quickly (< 2 minutes)
-- Uses limited window counts to avoid long execution times
-- Processes only first few windows from large datasets
-- Includes timing measurements for performance validation
-
-## Notes
-- **One-time evaluation per window**: `submit_forecast()` triggers evaluation, results are cached.  
-- **No recomputation in `to_results_csv()`**: it only checks completeness, aggregates cached results, and writes them out.  
-- **Forecast arrays are not saved**: only metrics/results are written to CSV to keep disk usage low.  

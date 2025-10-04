@@ -104,7 +104,6 @@ class Dataset:
         
         target_spec = target_spec.strip()
 
-        print("parsing target cols", target_spec, df_columns, timestamp_col)
         
         if target_spec.startswith("INDEX"):
             # Handle INDEX# format (e.g., INDEX1 means second column, index 1)
@@ -425,7 +424,6 @@ class Dataset:
         # Skip timestamp column, but process target and metadata columns
         check_cols = list(set(target_cols + metadata_cols))
         
-        print(check_cols, df.columns)
         # Convert target and metadata columns to numeric, handling comma-separated numbers
         if check_cols:
             # Check if any columns contain string values (including comma-separated numbers)
@@ -718,7 +716,6 @@ class Dataset:
             
             # Yield windows from current parquet file
             while self._current_window_index < len(self._windows):
-                print(self._windows[self._current_window_index].history())
                 yield self._windows[self._current_window_index]
                 self._current_window_index += 1
             

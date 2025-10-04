@@ -25,6 +25,7 @@ from musedfm.baselines import (
     LinearTrend, 
     ExponentialSmoothing
 )
+from musedfm.baselines.linear_regression import LinearRegressionForecast
 from musedfm.plotting import export_metrics_to_csv
 
 
@@ -58,7 +59,8 @@ def get_available_models():
         "historical_inertia": {"model": HistoricalInertia(), "univariate": True},
         "linear_trend": {"model": LinearTrend(), "univariate": True},
         "exponential_smoothing": {"model": ExponentialSmoothing(), "univariate": True},
-        "arima": {"model": ARIMAForecast(order=(1, 1, 1)), "univariate": True}
+        "arima": {"model": ARIMAForecast(order=(1, 1, 1)), "univariate": True},
+        "linear_regression": {"model": LinearRegressionForecast(), "univariate": False}
         # Add your custom models here:
         # "my_custom": {"model": MyCustomModel(), "univariate": False},
         # "another_model": {"model": AnotherModel(param1=value1, param2=value2), "univariate": True}
@@ -107,6 +109,15 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
             'time': 0.0,
             'windows': 0
         }
+        
+        # Initialize univariate results for all models
+        univariate_model_name = f"{model_name}_univariate"
+        results[univariate_model_name] = {
+            'metrics': {},
+            'dataset_results': [],
+            'time': 0.0,
+            'windows': 0
+        }
     
     # Iterate through benchmark structure: category -> domain -> dataset (outer loop)
     dataset_count = 0
@@ -140,6 +151,9 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 # Initialize per-model tracking for this dataset
                 model_dataset_windows = {model_name: 0 for model_name in models.keys()}
                 model_dataset_results = {model_name: [] for model_name in models.keys()}
+                # Add univariate results tracking for all models
+                for model_name, model in models.items():
+                    model_dataset_results[f"{model_name}_univariate"] = []
                 model_start_times = {model_name: time.time() for model_name in models.keys()}
                 
                 for i, window in enumerate(dataset):
@@ -149,27 +163,37 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                     
                     # Process this window with all models
                     for model_name, model in models.items():
-                        # Generate forecast
+                        # Generate univariate forecast (all models)
                         target_length = len(window.target())
-                        forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
+                        univariate_forecast = model["model"].forecast(window.history(), None, target_length)
                         
                         # Validate forecast length matches target length
-                        if len(forecast) != target_length:
-                            raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {len(forecast)} values, but target has {target_length} values")
+                        if len(univariate_forecast) != target_length:
+                            raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {len(univariate_forecast)} values, but target has {target_length} values")
                         
-                        # Get univariate flag for this model
-                        is_univariate = models[model_name]["univariate"]
-                        window.submit_forecast(forecast, univariate=is_univariate)
+                        # Generate multivariate forecast if model supports it
+                        multivariate_forecast = None
+                        if not model["univariate"]:
+                            multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
                         
-                        # Get evaluation results
-                        eval_results = window.evaluate()
-                        model_dataset_results[model_name].append(eval_results)
+                        # Submit both forecasts
+                        window.submit_forecast(multivariate_forecast, univariate_forecast)
+                        
+                        # Get evaluation results for multivariate forecast if submitted
+                        if multivariate_forecast is not None:
+                            multivariate_results = window.evaluate("multivariate")
+                            model_dataset_results[model_name].append(multivariate_results)
+                        
+                        # Store univariate results for all models
+                        if univariate_forecast is not None:
+                            univariate_results = window.evaluate("univariate")
+                            model_dataset_results[f"{model_name}_univariate"].append(univariate_results)
                         
                         # Collect data for plotting if requested
                         if collect_plot_data and results[model_name]['windows'] < 3:  # Only collect first 3 windows for plotting
                             plot_data.append({
                                 'window': window,
-                                'forecast': forecast,
+                                'forecast': multivariate_forecast,
                                 'model_name': model_name,
                                 'window_index': results[model_name]['windows'],
                                 'dataset_name': dataset.data_path.name
@@ -177,34 +201,71 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                         
                         model_dataset_windows[model_name] += 1
                         results[model_name]['windows'] += 1
+                        
+                        # Also count windows for univariate results if available
+                        if not model["univariate"] and univariate_forecast is not None:
+                            univariate_model_name = f"{model_name}_univariate"
+                            results[univariate_model_name]['windows'] += 1
+        
+        # Calculate average metrics and store results for each model
+        for model_name in models.keys():
+            # Calculate average metrics for this model on this dataset
+            if model_dataset_results[model_name]:
+                dataset_avg_metrics = {}
+                for metric in model_dataset_results[model_name][0].keys():
+                    values = [result[metric] for result in model_dataset_results[model_name]]
+                    dataset_avg_metrics[metric] = np.mean(values)
+            else:
+                dataset_avg_metrics = {}
+            
+            # Store dataset results for this model
+            results[model_name]['dataset_results'].append({
+                'dataset_name': dataset_name,
+                'metrics': dataset_avg_metrics,
+                'window_count': model_dataset_windows[model_name]
+            })
+            
+            model_elapsed_time = time.time() - model_start_times[model_name]
+            results[model_name]['time'] += model_elapsed_time
+            
+            print(f"    {model_name}: {model_dataset_windows[model_name]} windows in {model_elapsed_time:.2f}s")
+        
+        # Process univariate results for multivariate models
+        for model_name, model in models.items():
+            if not model["univariate"] and f"{model_name}_univariate" in model_dataset_results:
+                univariate_model_name = f"{model_name}_univariate"
                 
-                # Calculate average metrics and store results for each model
-                for model_name in models.keys():
-                    # Calculate average metrics for this model on this dataset
-                    if model_dataset_results[model_name]:
-                        dataset_avg_metrics = {}
-                        for metric in model_dataset_results[model_name][0].keys():
-                            values = [result[metric] for result in model_dataset_results[model_name]]
-                            dataset_avg_metrics[metric] = np.mean(values)
-                    else:
-                        dataset_avg_metrics = {}
-                    
-                    # Store dataset results for this model
-                    results[model_name]['dataset_results'].append({
-                        'dataset_name': dataset_name,
-                        'metrics': dataset_avg_metrics,
-                        'window_count': model_dataset_windows[model_name]
-                    })
-                    
-                    model_elapsed_time = time.time() - model_start_times[model_name]
-                    results[model_name]['time'] += model_elapsed_time
-                    
-                    print(f"    {model_name}: {model_dataset_windows[model_name]} windows in {model_elapsed_time:.2f}s")
+                # Calculate average metrics for univariate version
+                if model_dataset_results[univariate_model_name]:
+                    univariate_avg_metrics = {}
+                    for metric in model_dataset_results[univariate_model_name][0].keys():
+                        values = [result[metric] for result in model_dataset_results[univariate_model_name]]
+                        univariate_avg_metrics[metric] = np.mean(values)
+                else:
+                    univariate_avg_metrics = {}
                 
-                print(f"  Completed dataset {dataset_name}")
+                # Store univariate dataset results
+                results[univariate_model_name]['dataset_results'].append({
+                    'dataset_name': dataset_name,
+                    'metrics': univariate_avg_metrics,
+                    'window_count': model_dataset_windows[model_name]  # Same window count as multivariate
+                })
+                
+                # Use same elapsed time as multivariate model
+                results[univariate_model_name]['time'] += model_elapsed_time
+                
+                print(f"    {univariate_model_name}: {model_dataset_windows[model_name]} windows in {model_elapsed_time:.2f}s")
+        
+        print(f"  Completed dataset {dataset_name}")
     
     # Calculate overall average metrics across all datasets for each model
-    for model_name in models.keys():
+    all_model_names = list(models.keys())
+    # Add univariate model names for multivariate models
+    for model_name, model in models.items():
+        if not model["univariate"]:
+            all_model_names.append(f"{model_name}_univariate")
+    
+    for model_name in all_model_names:
         if results[model_name]['dataset_results']:
             overall_avg_metrics = {}
             for metric in ['MAPE', 'MAE', 'RMSE', 'NMAE']:
@@ -218,10 +279,18 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
         
         results[model_name]['metrics'] = overall_avg_metrics
         
+        # Determine model type for display
+        if model_name.endswith('_univariate'):
+            model_type = 'Univariate'
+            base_model_name = model_name.replace('_univariate', '')
+        else:
+            model_type = 'Univariate' if models[model_name]['univariate'] else 'Multivariate'
+            base_model_name = model_name
+        
         print(f"\n{model_name} Summary:")
         print(f"  Total windows: {results[model_name]['windows']}")
         print(f"  Total time: {results[model_name]['time']:.2f}s")
-        print(f"  Model type: {'Univariate' if models[model_name]['univariate'] else 'Multivariate'}")
+        print(f"  Model type: {model_type}")
         if overall_avg_metrics:
             print(f"  Average MAPE: {overall_avg_metrics['MAPE']:.2f}%")
             print(f"  Average MAE: {overall_avg_metrics['MAE']:.4f}")
@@ -291,12 +360,12 @@ def export_results_to_csv(benchmark_path: str, models: dict, max_windows: int = 
                 dataset_name = str(dataset.data_path.relative_to(benchmark.benchmark_path))
                 print(f"  Processing dataset: {dataset_name}")
                 dataset_windows = 0
-                
+    
                 for i, window in enumerate(dataset):
                     # Check max_windows per dataset, not overall
                     if max_windows is not None and dataset_windows >= max_windows:
                         break
-                    
+        
                     target_length = len(window.target())
                     forecast = first_model.forecast(window.history(), window.covariates(), target_length)
                     
