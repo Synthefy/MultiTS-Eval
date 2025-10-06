@@ -285,30 +285,32 @@ class Dataset:
         if special_loader_name == 'open_aq_special':
             from .special_loaders.open_aq_special import OpenAQSpecialLoader
             special_loader = OpenAQSpecialLoader(data_path)
-            
-            # Load all data using the special loader
-            dataframes = special_loader.load_all_data()
-            
-            if not dataframes:
-                raise ValueError(f"No data loaded for dataset {dataset_name}")
-            
-            # Create column config from special loader
-            column_config = {
-                'timestamp_col': dataset_config['timestamp_col'],
-                'target_cols': dataset_config['target_cols'],
-                'metadata_cols': dataset_config['metadata_cols'],
-                'from_json_config': True,
-                'special_loader': True,
-                'dataframes': dataframes
-            }
-            
-            # Create dataset instance with the dataframes
-            dataset = cls(data_path, history_length, forecast_horizon, stride, column_config)
-            dataset.dataset_name = dataset_name
-            return dataset
-            
+        elif special_loader_name == 'kitti_special':
+            from .special_loaders.kitti_special import KITTISpecialLoader
+            special_loader = KITTISpecialLoader(data_path)
         else:
             raise ValueError(f"Unknown special loader: {special_loader_name}")
+            
+        # Load all data using the special loader
+        dataframes = special_loader.load_all_data()
+        
+        if not dataframes:
+            raise ValueError(f"No data loaded for dataset {dataset_name}")
+        
+        # Create column config from special loader
+        column_config = {
+            'timestamp_col': dataset_config['timestamp_col'],
+            'target_cols': dataset_config['target_cols'],
+            'metadata_cols': dataset_config['metadata_cols'],
+            'from_json_config': True,
+            'special_loader': True,
+            'dataframes': dataframes
+        }
+        
+        # Create dataset instance with the dataframes
+        dataset = cls(data_path, history_length, forecast_horizon, stride, column_config)
+        dataset.dataset_name = dataset_name
+        return dataset
     
     def _load_parquet_paths(self) -> None:
         """Load parquet file paths for lazy loading."""
@@ -498,6 +500,17 @@ class Dataset:
                 if timestamp_col in df.columns:
                     self.column_config['used_timestamp_col'] = timestamp_col
                     break
+        
+        # Handle INDEX-based column selection (e.g., "INDEX 0" for first column)
+        if self.column_config.get('timestamp_col').startswith("INDEX "):
+            try:
+                index_num = int(self.column_config.get('timestamp_col').split("INDEX ")[1])
+                if 0 <= index_num < len(df.columns):
+                    self.column_config['used_timestamp_col'] = df.columns[index_num]
+                else:
+                    raise ValueError(f"Column index {index_num} out of range. DataFrame has {len(df.columns)} columns.")
+            except (ValueError, IndexError) as e:
+                raise ValueError(f"Invalid INDEX specification: {self.column_config.get('timestamp_col')}. {e}")
                 
         windows = self._load_windows_general(df)
         return windows
@@ -755,8 +768,15 @@ class Dataset:
         aggregated = {}
         for metric in all_results[0].keys():
             values = [result[metric] for result in all_results]
-            aggregated[metric] = np.mean(values)
-            aggregated[f"{metric}_std"] = np.std(values)
+            # Skip NaN values when averaging
+            valid_values = [v for v in values if not np.isnan(v)]
+            if valid_values:
+                aggregated[metric] = np.mean(valid_values)
+                aggregated[f"{metric}_std"] = np.std(valid_values)
+            else:
+                aggregated[metric] = np.nan
+                aggregated[f"{metric}_std"] = np.nan
+                print(f"Warning: All {metric} values are NaN for dataset {self.data_path.name}")
         
         return aggregated
     

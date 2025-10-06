@@ -17,6 +17,10 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     Returns:
         MAPE value as a percentage
     """
+    # Convert to float arrays to ensure numeric operations
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    
     # Remove NaN values from both arrays
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
     y_true_clean = y_true[valid_mask]
@@ -45,6 +49,10 @@ def MAE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     Returns:
         MAE value
     """
+    # Convert to float arrays to ensure numeric operations
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    
     # Remove NaN values from both arrays
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
     y_true_clean = y_true[valid_mask]
@@ -68,6 +76,10 @@ def RMSE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     Returns:
         RMSE value
     """
+    # Convert to float arrays to ensure numeric operations
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    
     # Remove NaN values from both arrays
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
     y_true_clean = y_true[valid_mask]
@@ -91,6 +103,10 @@ def NMAE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     Returns:
         NMAE value (MAE normalized by the mean of true values)
     """
+    # Convert to float arrays to ensure numeric operations
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    
     # Remove NaN values from both arrays
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
     y_true_clean = y_true[valid_mask]

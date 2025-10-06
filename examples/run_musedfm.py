@@ -218,7 +218,13 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                         dataset_avg_metrics = {}
                         for metric in model_dataset_results[model_name][0].keys():
                             values = [result[metric] for result in model_dataset_results[model_name]]
-                            dataset_avg_metrics[metric] = np.mean(values)
+                            # Skip NaN values when averaging
+                            valid_values = [v for v in values if not np.isnan(v)]
+                            if valid_values:
+                                dataset_avg_metrics[metric] = np.mean(valid_values)
+                            else:
+                                dataset_avg_metrics[metric] = np.nan
+                                print(f"    Warning: All {metric} values are NaN for {model_name} on dataset {dataset_name}")
                     else:
                         dataset_avg_metrics = {}
                     
@@ -244,7 +250,13 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                             univariate_avg_metrics = {}
                             for metric in model_dataset_results[univariate_model_name][0].keys():
                                 values = [result[metric] for result in model_dataset_results[univariate_model_name]]
-                                univariate_avg_metrics[metric] = np.mean(values)
+                                # Skip NaN values when averaging
+                                valid_values = [v for v in values if not np.isnan(v)]
+                                if valid_values:
+                                    univariate_avg_metrics[metric] = np.mean(valid_values)
+                                else:
+                                    univariate_avg_metrics[metric] = np.nan
+                                    print(f"    Warning: All {metric} values are NaN for {univariate_model_name} on dataset {dataset_name}")
                         else:
                             univariate_avg_metrics = {}
                         
@@ -275,7 +287,16 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
             for metric in ['MAPE', 'MAE', 'RMSE', 'NMAE']:
                 values = [result['metrics'][metric] for result in results[model_name]['dataset_results'] if metric in result['metrics']]
                 if values:
-                    overall_avg_metrics[metric] = np.mean(values)
+                    # Skip NaN values when averaging across datasets
+                    valid_values = [v for v in values if not np.isnan(v)]
+                    if valid_values:
+                        overall_avg_metrics[metric] = np.mean(valid_values)
+                        if len(valid_values) < len(values):
+                            nan_count = len(values) - len(valid_values)
+                            print(f"  Warning: {nan_count} out of {len(values)} datasets had NaN {metric} for {model_name}")
+                    else:
+                        overall_avg_metrics[metric] = np.nan
+                        print(f"  Warning: All {metric} values are NaN for {model_name} across all datasets")
                 else:
                     overall_avg_metrics[metric] = np.nan
         else:
