@@ -8,11 +8,13 @@ import json
 import re
 import random
 from datetime import datetime, timedelta
-from typing import Iterator, Dict, Any, List, Optional, Union
+from typing import List, Iterator, Dict, Any, Optional, Union
 from pathlib import Path
-from .window import Window
+import os
+from musedfm.data.window import Window
 
-from .special_loaders.open_aq_special import OpenAQSpecialLoader
+from musedfm.data.special_loaders.open_aq_special import OpenAQSpecialLoader
+from musedfm.data.special_loaders.kitti_special import KITTISpecialLoader
 
 
 class Dataset:
@@ -31,6 +33,74 @@ class Dataset:
             return json.load(f)
     
     @classmethod
+    def _parse_index_based_spec(cls, spec: str, df_columns: List[str], timestamp_col: str) -> List[str]:
+        """Helper function to parse index-based column specifications.
+        
+        Handles patterns like:
+        - INDEX# (e.g., INDEX1 means second column, index 1)
+        - "second column (index 1)"
+        - "last non-timestamp column"
+        - "all non-timestamp columns"
+        """
+        spec = spec.strip()
+        
+        if spec.startswith("INDEX"):
+            # Handle INDEX# format (e.g., INDEX1 means second column, index 1)
+            try:
+                index_num = int(spec[5:])  # Extract number after "INDEX"
+                if 0 <= index_num < len(df_columns):
+                    return [df_columns[index_num]]
+                else:
+                    return []
+            except (ValueError, IndexError):
+                return []
+        
+        elif "second column (index 1)" in spec.lower():
+            # Return the second column (index 1)
+            return [df_columns[1]] if len(df_columns) > 1 else []
+        
+        elif "last non-timestamp column" in spec.lower():
+            # Return the last non-timestamp column
+            non_timestamp_cols = [col for col in df_columns if col != timestamp_col]
+            return [non_timestamp_cols[-1]] if non_timestamp_cols else []
+        
+        elif "all non-timestamp columns" in spec.lower():
+            # Return all non-timestamp columns
+            return [col for col in df_columns if col != timestamp_col]
+        
+        return []  # No index-based pattern matched
+
+    @classmethod
+    def _parse_timestamp_col(cls, timestamp_spec: str, df_columns: List[str]) -> str:
+        """Parse timestamp column specification into actual column name.
+        
+        Handles patterns like:
+        - Direct column names (e.g., "timestamp", "datetime")
+        - INDEX# format (e.g., INDEX0 means first column, index 0)
+        - Special values like "COMBINE_DATETIME_COLUMNS", "AUTOMATICALLY GENERATED"
+        - OR|| patterns for multiple candidates
+        """
+        timestamp_spec = timestamp_spec.strip()
+                
+        # Handle OR|| patterns
+        if " OR|| " in timestamp_spec:
+            candidates = timestamp_spec.split(" OR|| ")
+            for candidate in candidates:
+                candidate = candidate.strip()
+                # Only check direct column names, not INDEX patterns
+                if candidate in df_columns:
+                    return candidate
+            return candidates[0].strip()  # Return first candidate as fallback
+        
+        # Try index-based parsing
+        if timestamp_spec.startswith("INDEX"):
+            index_num = int(timestamp_spec[5:])
+            return df_columns[index_num]
+        
+        # Return the spec as-is if it's a direct column name or other pattern
+        return timestamp_spec
+
+    @classmethod
     def _parse_metadata_cols(cls, metadata_spec: Union[str, List[str]], 
                            df_columns: List[str], timestamp_col: str, 
                            target_cols: List[str], current_target: Optional[str] = None) -> List[str]:
@@ -47,6 +117,11 @@ class Dataset:
             return result
         
         metadata_spec = metadata_spec.strip()
+        
+        # Try index-based parsing first
+        index_result = cls._parse_index_based_spec(metadata_spec, df_columns, timestamp_col)
+        if index_result:
+            return index_result
         
         if metadata_spec == "ALL EXCEPT TS TARGET":
             # All columns except timestamp and target columns
@@ -104,30 +179,10 @@ class Dataset:
         
         target_spec = target_spec.strip()
 
-        
-        if target_spec.startswith("INDEX"):
-            # Handle INDEX# format (e.g., INDEX1 means second column, index 1)
-            try:
-                index_num = int(target_spec[5:])  # Extract number after "INDEX"
-                if 0 <= index_num < len(df_columns):
-                    return [df_columns[index_num]]
-                else:
-                    return []
-            except (ValueError, IndexError):
-                return []
-        
-        elif "second column (index 1)" in target_spec.lower():
-            # Return the second column (index 1)
-            return [df_columns[1]] if len(df_columns) > 1 else []
-        
-        elif "last non-timestamp column" in target_spec.lower():
-            # Return the last non-timestamp column
-            non_timestamp_cols = [col for col in df_columns if col != timestamp_col]
-            return [non_timestamp_cols[-1]] if non_timestamp_cols else []
-        
-        elif "all non-timestamp columns" in target_spec.lower():
-            # Return all non-timestamp columns
-            return [col for col in df_columns if col != timestamp_col]
+        # Try index-based parsing first
+        index_result = cls._parse_index_based_spec(target_spec, df_columns, timestamp_col)
+        if index_result:
+            return index_result
         
         elif target_spec == "ALL EXCEPT TS TARGET":
             # For targets, this means all non-timestamp columns
@@ -165,7 +220,7 @@ class Dataset:
             return [target_spec]
     
     def __init__(self, data_path: str, history_length: int = 30, forecast_horizon: int = 1, 
-                 stride: int = 1, column_config: Optional[Dict[str, Any]] = None):
+                 stride: int = 1, column_config: Optional[Dict[str, Any]] = None, needs_counting: bool = False):
         """
         Initialize dataset from parquet files.
         
@@ -180,6 +235,7 @@ class Dataset:
                               'target_cols': ['col1', 'col2'] or callable,
                               'covariate_cols': ['col3', 'col4'] or callable
                           }
+            needs_counting: If True, count windows
         """
         self.data_path = Path(data_path)
         self.dataset_name = self.data_path.name
@@ -195,7 +251,8 @@ class Dataset:
         self._parquet_files: List[Path] = []
         self._total_windows: int = 0
         self._load_parquet_paths()
-        self._count_windows()
+        if needs_counting:
+            self._count_windows()
     
     @classmethod
     def with_custom_config(cls, data_path: str, timestamp_col: str, 
@@ -227,7 +284,7 @@ class Dataset:
     
     @classmethod
     def from_config(cls, data_path: str, dataset_name: str, 
-                   history_length: int = 30, forecast_horizon: int = 1, stride: int = 1) -> 'Dataset':
+                   history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, needs_counting: bool = True) -> 'Dataset':
         """
         Create a dataset using configuration from the JSON config file.
         
@@ -237,7 +294,7 @@ class Dataset:
             history_length: Number of historical points to use for forecasting
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
-            
+            needs_counting: If True, count windows
         Returns:
             Dataset instance with configuration from JSON file
         """
@@ -250,7 +307,7 @@ class Dataset:
         # Check if this dataset uses a special loader
         if 'special_loader' in dataset_config:
             return cls._create_with_special_loader(data_path, dataset_name, dataset_config, 
-                                                 history_length, forecast_horizon, stride)
+                                                 history_length, forecast_horizon, stride, needs_counting)
         
         # Create a special config that will be processed by the generalized loader
         column_config = {
@@ -260,11 +317,11 @@ class Dataset:
             'from_json_config': True  # Flag to indicate this comes from JSON config
         }
         
-        return cls(data_path, history_length, forecast_horizon, stride, column_config)
+        return cls(data_path, history_length, forecast_horizon, stride, column_config, needs_counting)
     
     @classmethod
     def _create_with_special_loader(cls, data_path: str, dataset_name: str, dataset_config: Dict[str, Any],
-                                  history_length: int, forecast_horizon: int, stride: int) -> 'Dataset':
+                                  history_length: int, forecast_horizon: int, stride: int, needs_counting: bool = True) -> 'Dataset':
         """
         Create a dataset using a special loader for datasets with unique formats.
         
@@ -275,7 +332,7 @@ class Dataset:
             history_length: Number of historical points to use for forecasting
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
-            
+            needs_counting: If True, count windows
         Returns:
             Dataset instance with special loader
         """
@@ -283,32 +340,32 @@ class Dataset:
         
         # Import the appropriate special loader
         if special_loader_name == 'open_aq_special':
-            from .special_loaders.open_aq_special import OpenAQSpecialLoader
             special_loader = OpenAQSpecialLoader(data_path)
-            
-            # Load all data using the special loader
-            dataframes = special_loader.load_all_data()
-            
-            if not dataframes:
-                raise ValueError(f"No data loaded for dataset {dataset_name}")
-            
-            # Create column config from special loader
-            column_config = {
-                'timestamp_col': dataset_config['timestamp_col'],
-                'target_cols': dataset_config['target_cols'],
-                'metadata_cols': dataset_config['metadata_cols'],
-                'from_json_config': True,
-                'special_loader': True,
-                'dataframes': dataframes
-            }
-            
-            # Create dataset instance with the dataframes
-            dataset = cls(data_path, history_length, forecast_horizon, stride, column_config)
-            dataset.dataset_name = dataset_name
-            return dataset
-            
+        elif special_loader_name == 'kitti_special':
+            special_loader = KITTISpecialLoader(data_path)
         else:
             raise ValueError(f"Unknown special loader: {special_loader_name}")
+            
+        # Load all data using the special loader
+        dataframes = special_loader.load_all_data()
+        
+        if not dataframes:
+            raise ValueError(f"No data loaded for dataset {dataset_name}")
+        
+        # Create column config from special loader
+        column_config = {
+            'timestamp_col': dataset_config['timestamp_col'],
+            'target_cols': dataset_config['target_cols'],
+            'metadata_cols': dataset_config['metadata_cols'],
+            'from_json_config': True,
+            'special_loader': True,
+            'dataframes': dataframes
+        }
+        
+        # Create dataset instance with the dataframes
+        dataset = cls(data_path, history_length, forecast_horizon, stride, column_config, needs_counting)
+        dataset.dataset_name = dataset_name
+        return dataset
     
     def _load_parquet_paths(self) -> None:
         """Load parquet file paths for lazy loading."""
@@ -445,7 +502,8 @@ class Dataset:
         # Track which columns were dropped
         dropped_cols = set(df.columns) - set(df_cleaned.columns)
         if dropped_cols:
-            print(f"Dropped columns due to all NaN values: {dropped_cols}")
+            pass
+            # print(f"Dropped columns due to all NaN values: {dropped_cols}")
         
         # Update target and metadata column lists to remove dropped columns
         updated_target_cols = [col for col in target_cols if col in df_cleaned.columns]
@@ -478,26 +536,27 @@ class Dataset:
         if self.column_config is None:
             self.column_config = self._auto_detect_column_config(df)
         
+        # Handle timestamp column parsing
+        timestamp_spec = self.column_config.get('timestamp_col')
+        parsed_timestamp_col = self._parse_timestamp_col(timestamp_spec, df.columns.tolist())
+        
         # Handle automatically generated timestamps if needed
-        if self.column_config.get('timestamp_col') == "AUTOMATICALLY GENERATED":
+        if parsed_timestamp_col == "AUTOMATICALLY GENERATED":
             timestamp_col = "timestamp"
             if timestamp_col not in df.columns:
                 df[timestamp_col] = self._generate_timestamps(len(df))
             self.column_config['used_timestamp_col'] = timestamp_col
         
         # Handle combining separate datetime columns if needed
-        if self.column_config.get('timestamp_col') == "COMBINE_DATETIME_COLUMNS":
+        elif parsed_timestamp_col == "COMBINE_DATETIME_COLUMNS":
             timestamp_col = "timestamp"
             if timestamp_col not in df.columns:
                 df = self._combine_datetime_columns(df, timestamp_col)
             self.column_config['used_timestamp_col'] = timestamp_col
         
-        if self.column_config.get('timestamp_col').find(" OR|| ") != -1:
-            timestamp_col_candidates = self.column_config.get('timestamp_col').split(" OR|| ")
-            for timestamp_col in timestamp_col_candidates:
-                if timestamp_col in df.columns:
-                    self.column_config['used_timestamp_col'] = timestamp_col
-                    break
+        else:
+            # Use the parsed timestamp column
+            self.column_config['used_timestamp_col'] = parsed_timestamp_col
                 
         windows = self._load_windows_general(df)
         return windows
@@ -584,7 +643,7 @@ class Dataset:
 
         return df
     
-    def _create_windows_with_stride(self, target_series: np.ndarray, covariate_data: np.ndarray) -> None:
+    def _create_windows_with_stride(self, target_series: np.ndarray, covariate_data: np.ndarray, timestamp_data: Optional[np.ndarray] = None) -> None:
         """Create windows with stride parameter and handle incomplete windows."""
         data_length = len(target_series)
         
@@ -624,7 +683,17 @@ class Dataset:
                 target = target_series[target_start:target_end]
                 covariates = covariate_data[start_idx:history_end]
                 
-                window = Window(history, target, covariates)
+                # Skip windows where target is completely NaN
+                if np.all(np.isnan(target)) or np.all(np.isnan(history)):
+                    print(f"Skipping window with completely NaN target: {start_idx}")
+                    continue
+                
+                # Extract timestamps for this window if available
+                timestamps = None
+                if timestamp_data is not None:
+                    timestamps = timestamp_data[start_idx:target_end]
+                
+                window = Window(history, target, covariates, timestamps)
                 windows.append(window)
                 
             elif available_data >= MIN_HISTORY_FORECAST_LENGTH * 2:
@@ -638,10 +707,18 @@ class Dataset:
                 target = target_series[target_start:target_end]
                 covariates = covariate_data[start_idx:history_end]
                 
-                window = Window(history, target, covariates)
+                # Skip windows where target is completely NaN
+                if np.all(np.isnan(target)) or np.all(np.isnan(history)):
+                    print(f"Skipping window with completely NaN target: {start_idx}")
+                    continue
+                
+                # Extract timestamps for this window if available
+                timestamps = None
+                if timestamp_data is not None:
+                    timestamps = timestamp_data[start_idx:target_end]
+                
+                window = Window(history, target, covariates, timestamps)
                 windows.append(window)
-            else:
-                print(f"Skipping window with available data: {available_data}")                
             # Skip windows that don't meet minimum requirements
         return windows
 
@@ -688,8 +765,13 @@ class Dataset:
             else:
                 covariate_data = np.zeros((len(df), 1))
             
+            # Extract timestamp data if available
+            timestamp_data = None
+            if timestamp_col in df.columns:
+                timestamp_data = df[timestamp_col].values
+            
             # Create sliding windows with stride and incomplete window handling
-            windows = self._create_windows_with_stride(target_series, covariate_data)
+            windows = self._create_windows_with_stride(target_series, covariate_data, timestamp_data)
             all_windows.extend(windows)
         return all_windows
     

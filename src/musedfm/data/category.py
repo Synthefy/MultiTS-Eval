@@ -6,7 +6,7 @@ import os
 import json
 from typing import Iterator, Dict, Any, List
 from pathlib import Path
-from .domain import Domain
+from musedfm.data.domain import Domain
 from collections import OrderedDict
 
 class Category:
@@ -17,15 +17,20 @@ class Category:
     Aggregates results across domains.
     """
     
-    def __init__(self, category_path: str, dataset_domain_map: Dict[str, str], dataset_category_map: Dict[str, str], category_names: Dict[str, Dict[str, List[str]]], domain_category_map: Dict[str, str], history_length: int = 30, forecast_horizon: int = 1, stride: int = 1):
+    def __init__(self, category_path: str, dataset_domain_map: Dict[str, str], dataset_category_map: Dict[str, str], category_names: Dict[str, Dict[str, List[str]]], domain_category_map: Dict[str, str], history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False):
         """
         Initialize category from directory containing multiple domain directories.
         
         Args:
             category_path: Path to directory containing domain subdirectories
+            dataset_domain_map: Dictionary mapping dataset names to domain names
+            dataset_category_map: Dictionary mapping dataset names to category names
+            category_names: Dictionary of category names and their domains/datasets
+            domain_category_map: Dictionary mapping domain names to category names
             history_length: Number of historical points to use for forecasting
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
+            load_cached_counts: If True, load window counts from cached JSON files instead of generating
         """
 
         self.category_path = Path(category_path)
@@ -37,9 +42,14 @@ class Category:
         self.dataset_category_map = dataset_category_map
         self.domain_category_map = domain_category_map
         self.category_names = category_names
+        self.load_cached_counts = load_cached_counts
         self.iterated_dataset_dict = json.load(open(Path(__file__).parent / "iterated_datasets.json"))
         self._domains: List[Domain] = []
         self._load_domains()
+        
+        # Load cached window counts if requested
+        if load_cached_counts:
+            self._load_cached_window_counts()
     
     def _load_domains(self) -> None:
         """Load domains based on data_hierarchy.json, creating virtual domains for datasets."""
@@ -58,10 +68,10 @@ class Category:
                     self.per_domain_paths[domain_name].append(dataset_subpath)
                 else:
                     print(f"Dataset {dataset_subpath.name} not found in data_hierarchy.json")
-        
+            
         # load the domains and check if there are any missing domains or datasets
         for domain in self.per_domain_paths:
-            domain = Domain(domain, self.per_domain_paths[domain], self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride)
+            domain = Domain(domain, self.per_domain_paths[domain], self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, needs_counting=not self.load_cached_counts)
             self._domains.append(domain)
         
         for domain in self.category_names[self.category]:
@@ -158,3 +168,54 @@ class Category:
         
         print(f"Results saved to {path}")
         print(f"Aggregated results saved to {aggregated_path}")
+    
+    def save_window_counts(self, base_path: str = "/workspace/data/fm_eval_nested") -> None:
+        """Save window counts to JSON file and copy to compressed tar directory."""
+        import shutil
+        
+        os.makedirs(base_path, exist_ok=True)
+        
+        # Create filename with parameters
+        filename = f"{self.category}_window_counts_h{self.history_length}_f{self.forecast_horizon}_s{self.stride}.json"
+        
+        window_counts = {dataset.dataset_name: len(dataset) for domain in self._domains for dataset in domain._datasets}
+        
+        json_path = os.path.join(base_path, filename)
+        with open(json_path, 'w') as f:
+            json.dump(window_counts, f, indent=2)
+        
+        # Copy to compressed tar directory
+        compressed_tar_path = "/workspace/data/fm_eval_compressed_tar"
+        if os.path.exists(compressed_tar_path):
+            os.makedirs(compressed_tar_path, exist_ok=True)
+            shutil.copy2(json_path, os.path.join(compressed_tar_path, filename))
+    
+    def load_window_counts(self, base_path: str = "/workspace/data/fm_eval_nested") -> Dict[str, int]:
+        """Load window counts from JSON file if present."""
+        filename = f"{self.category}_window_counts_h{self.history_length}_f{self.forecast_horizon}_s{self.stride}.json"
+        json_path = os.path.join(base_path, filename)
+        
+        if os.path.exists(json_path):
+            with open(json_path, 'r') as f:
+                return json.load(f)
+        return {}
+    
+    def get_window_counts(self, use_cached: bool = True, base_path: str = "/workspace/data/fm_eval_nested") -> Dict[str, int]:
+        """Get window counts, optionally from cached JSON file."""
+        if use_cached:
+            cached_counts = self.load_window_counts(base_path)
+            if cached_counts:
+                return cached_counts
+        
+        return {dataset.dataset_name: len(dataset) for domain in self._domains for dataset in domain._datasets}
+    
+    def _load_cached_window_counts(self) -> None:
+        """Load cached window counts and override dataset window counts."""
+        cached_counts = self.load_window_counts()
+        if cached_counts:
+            # Override window counts for datasets that have cached values
+            for domain in self._domains:
+                for dataset in domain._datasets:
+                    if dataset.dataset_name in cached_counts:
+                        dataset._total_windows = cached_counts[dataset.dataset_name]
+        print("successfully counted windows from cached JSON files")

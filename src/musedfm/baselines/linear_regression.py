@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from typing import Optional
+import matplotlib.pyplot as plt
 
 
 class LinearRegressionForecast:
@@ -41,142 +42,196 @@ class LinearRegressionForecast:
     def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, 
                  forecast_horizon: int = 1) -> np.ndarray:
         """
-        Generate forecast using linear regression.
+        Generate forecast using simple linear regression on the whole history.
         
         Args:
             history: Historical target values
-            covariates: Historical covariate values (can be None for univariate mode)
+            covariates: Historical covariate values (ignored for simplicity)
             forecast_horizon: Number of steps to forecast
             
         Returns:
             Array of forecasted values
         """
-        if len(history) < self.lookback_window:
+        if len(history) < 2:
             # Fallback to mean if insufficient history
             return np.full(forecast_horizon, np.mean(history))
         
         # Handle NaN values in history
         if np.any(np.isnan(history)):
             # Replace NaN values with forward fill, then backward fill
-            history = pd.Series(history).fillna(method='ffill').fillna(method='bfill').values
-            # If still NaN, replace with mean
+            history = pd.Series(history).ffill().bfill().values
+            # If still NaN, replace with mean (handle empty slice case)
             if np.any(np.isnan(history)):
-                history = np.nan_to_num(history, nan=np.nanmean(history))
+                # Check if all values are NaN to avoid empty slice warning
+                if np.all(np.isnan(history)):
+                    # If all values are NaN, use 0 as fallback
+                    history = np.zeros_like(history)
+                else:
+                    # Use nanmean only if there are some non-NaN values
+                    history = np.nan_to_num(history, nan=np.nanmean(history))
         
         # Handle NaN values in covariates
         if covariates is not None and np.any(np.isnan(covariates)):
-            covariates = np.nan_to_num(covariates, nan=0.0)
+            # Replace NaN values with mean for each covariate column (handle empty slice case)
+            # Check if any columns are entirely NaN to avoid empty slice warning
+            nan_means = np.nanmean(covariates, axis=0)
+            # Replace NaN means (from entirely NaN columns) with 0
+            nan_means = np.nan_to_num(nan_means, nan=0.0)
+            covariates = np.nan_to_num(covariates, nan=nan_means)
+
         
-        # Normalize history
+        # Prepare features for regression
+        if covariates is not None and len(covariates) > 0:
+            # Use both time indices and covariates
+            time_features = np.arange(len(history)).reshape(-1, 1)
+            # Ensure covariates have the same length as history
+            if len(covariates) >= len(history):
+                covariate_features = covariates[:len(history)]
+            else:
+                # Pad covariates if shorter than history
+                padding = np.zeros((len(history) - len(covariates), covariates.shape[1]))
+                covariate_features = np.vstack([covariates, padding])
+            
+            # Combine time and covariate features
+            X = np.hstack([time_features, covariate_features])
+        else:
+            # Use only time indices if no covariates
+            X = np.arange(len(history)).reshape(-1, 1)
+        
+        y = history  # Target values
+        
+        # Train linear regression model only if not already trained with same dimensions
+        if not hasattr(self, 'model') or self.model is None or not hasattr(self.model, 'coef_') or self.model.coef_.shape[0] != X.shape[1]:
+            print(f"Debug: Training model with {X.shape[1]} features")
+            self.model = LinearRegression()
+            self.model.fit(X, y)
+        else:
+            print(f"Debug: Reusing existing model with {self.model.coef_.shape[0]} features")
+        
+        # Store history info for plotting
         self.history_mean = np.mean(history)
         self.history_std = np.std(history)
-        if self.history_std == 0:
-            self.history_std = 1.0
-        history_normalized = (history - self.history_mean) / self.history_std
-        
-        # Normalize covariates if available
-        if covariates is not None:
-            self.covariate_mean = np.mean(covariates, axis=0)
-            self.covariate_std = np.std(covariates, axis=0)
-            # Avoid division by zero
-            self.covariate_std[self.covariate_std == 0] = 1.0
-            covariates_normalized = (covariates - self.covariate_mean) / self.covariate_std
-        else:
-            covariates_normalized = None
-        
-        # Determine if we should use covariates
-        use_covs = self.use_covariates and covariates_normalized is not None and len(covariates_normalized) > 0
-        
-        # Prepare features with consistent dimensions
-        X = []
-        y = []
-        
-        for i in range(self.lookback_window, len(history_normalized)):
-            # Target features: previous lookback_window values
-            target_features = history_normalized[i-self.lookback_window:i]
-            
-            # Covariate features: corresponding covariate values (if available)
-            if use_covs and len(covariates_normalized) > i:
-                covariate_features = covariates_normalized[i-self.lookback_window:i].flatten()
-                features = np.concatenate([target_features, covariate_features])
-            else:
-                # Pad with zeros if no covariates
-                if covariates_normalized is not None and len(covariates_normalized.shape) > 1:
-                    covariate_dim = covariates_normalized.shape[1]
-                else:
-                    covariate_dim = 1
-                covariate_features = np.zeros(self.lookback_window * covariate_dim)
-                features = np.concatenate([target_features, covariate_features])
-            
-            X.append(features)
-            y.append(history_normalized[i])
-        
-        if len(X) == 0:
-            return np.full(forecast_horizon, np.mean(history))
-        
-        X = np.array(X)
-        y = np.array(y)
-        
-        # Handle infinite and extreme values
-        X = np.nan_to_num(X, nan=0.0, posinf=1e6, neginf=-1e6)
-        y = np.nan_to_num(y, nan=0.0, posinf=1e6, neginf=-1e6)
-        
-        # Train the model
-        self.model.fit(X, y)
-        self.feature_dim = X.shape[1]
+        self.history_length = len(history)
         
         # Generate forecasts
         forecasts = []
-        current_history = history_normalized[-self.lookback_window:].copy()
-        
-        for _ in range(forecast_horizon):
-            # Prepare features for next prediction
-            if use_covs and len(covariates_normalized) >= len(history_normalized) + len(forecasts):
+        for i in range(forecast_horizon):
+            # Predict next time step
+            next_time = len(history) + i
+            
+            if covariates is not None and len(covariates) > 0:
                 # Use future covariate values if available
-                covariate_idx = len(history_normalized) + len(forecasts)
-                if covariate_idx < len(covariates_normalized):
-                    covariate_features = covariates_normalized[covariate_idx-self.lookback_window:covariate_idx].flatten()
-                    features = np.concatenate([current_history, covariate_features])
+                covariate_idx = len(history) + i
+                if covariate_idx < len(covariates):
+                    covariate_features = covariates[covariate_idx]
                 else:
                     # Use last available covariate values
-                    last_covariates = covariates_normalized[-self.lookback_window:].flatten()
-                    features = np.concatenate([current_history, last_covariates])
+                    covariate_features = covariates[-1]
+                
+                # Combine time and covariate features
+                features = np.hstack([[next_time], covariate_features])
             else:
-                # Pad with zeros if no covariates
-                if covariates_normalized is not None and len(covariates_normalized.shape) > 1:
-                    covariate_dim = covariates_normalized.shape[1]
-                else:
-                    covariate_dim = 1
-                covariate_features = np.zeros(self.lookback_window * covariate_dim)
-                features = np.concatenate([current_history, covariate_features])
+                # Use only time index
+                features = [next_time]
             
             # Ensure features match training dimensions
-            if len(features) != self.feature_dim:
-                if len(features) < self.feature_dim:
-                    features = np.pad(features, (0, self.feature_dim - len(features)), 'constant')
+            if len(features) != self.model.coef_.shape[0]:
+                if len(features) < self.model.coef_.shape[0]:
+                    # Pad with zeros
+                    features = np.pad(features, (0, self.model.coef_.shape[0] - len(features)), 'constant')
                 else:
-                    features = features[:self.feature_dim]
+                    # Truncate
+                    features = features[:self.model.coef_.shape[0]]
             
-            # Handle extreme values in features
-            features = np.nan_to_num(features, nan=0.0, posinf=1e6, neginf=-1e6)
-            
-            # Make prediction (in normalized space)
-            pred_normalized = self.model.predict([features])[0]
-            
-            # Handle extreme predictions
-            if np.isnan(pred_normalized) or np.isinf(pred_normalized):
-                pred_normalized = 0.0  # Mean in normalized space
-            
-            # Denormalize prediction
-            pred = pred_normalized * self.history_std + self.history_mean
-            
-            # Clip denormalized prediction to reasonable bounds
-            pred = np.clip(pred, -1e10, 1e10)
-            
+            pred = self.model.predict([features])[0]
             forecasts.append(pred)
-            
-            # Update history for next prediction (in normalized space)
-            current_history = np.roll(current_history, -1)
-            current_history[-1] = pred_normalized
         
         return np.array(forecasts)
+    
+    def plot_linear_fit(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, 
+                       save_path: Optional[str] = None):
+        """
+        Plot the linear regression fit using the existing trained model.
+        
+        Args:
+            history: Historical target values
+            covariates: Historical covariate values (optional)
+            save_path: Path to save the plot (optional)
+        """
+        if not hasattr(self, 'model') or self.model is None:
+            print("No trained model available for plotting")
+            return
+        
+        if len(history) < 2:
+            print("Insufficient history for plotting")
+            return
+        
+        # Debug: Check model dimensions
+        print(f"Debug: Model expects {self.model.coef_.shape[0]} features")
+        print(f"Debug: History length: {len(history)}")
+        print(f"Debug: Covariates shape: {covariates.shape if covariates is not None else 'None'}")
+        
+        # Generate predictions using the trained model
+        # Prepare features the same way as in training
+        if covariates is not None and len(covariates) > 0:
+            # Use both time indices and covariates
+            time_features = np.arange(len(history)).reshape(-1, 1)
+            # Ensure covariates have the same length as history
+            if len(covariates) >= len(history):
+                covariate_features = covariates[:len(history)]
+            else:
+                # Pad covariates if shorter than history
+                padding = np.zeros((len(history) - len(covariates), covariates.shape[1]))
+                covariate_features = np.vstack([covariates, padding])
+            
+            # Combine time and covariate features
+            X = np.hstack([time_features, covariate_features])
+        else:
+            # Use only time indices if no covariates
+            X = np.arange(len(history)).reshape(-1, 1)
+        
+        print(f"Debug: Prepared X shape: {X.shape}")
+        
+        predictions = self.model.predict(X)
+        
+        # Create simple plot
+        plt.figure(figsize=(10, 6))
+        
+        # Plot original history
+        time_indices = np.arange(len(history))
+        plt.plot(time_indices, history, 'b-', label='Original History', linewidth=2)
+        
+        # Plot fitted values
+        plt.plot(time_indices, predictions, 'r--', label='Linear Regression Fit', linewidth=2)
+        
+        # Add vertical line to separate training and forecast regions
+        plt.axvline(x=len(history)-1, color='green', linestyle=':', linewidth=2, 
+                   label='End of History')
+        
+        # Calculate R² score
+        from sklearn.metrics import r2_score
+        r2 = r2_score(history, predictions)
+        
+        plt.title(f'Linear Regression Fit (R²: {r2:.4f})')
+        plt.xlabel('Time Index')
+        plt.ylabel('Value')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        if save_path:
+            plt.savefig(save_path, dpi=150, bbox_inches='tight')
+            print(f"Plot saved to: {save_path}")
+        
+        plt.show()
+        
+        # Print diagnostic information
+        print(f"\nLinear Regression Diagnostic:")
+        print(f"  History length: {len(history)}")
+        print(f"  R² score: {r2:.4f}")
+        print(f"  History mean: {self.history_mean:.4f}")
+        print(f"  History std: {self.history_std:.4f}")
+        print(f"  Features used: {X.shape[1]} (time + {'covariates' if covariates is not None and len(covariates) > 0 else 'no covariates'})")
+        
+        # Check for potential issues
+        if r2 < 0.1:
+            print(f"  ⚠ Low R² score suggests poor linear fit")

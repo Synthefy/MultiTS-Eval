@@ -44,5 +44,12 @@
         "northern_electricity",
         "southern_electricity",
         "western_electricity"
+    ],
+    "synthetic_scm": [
+        "large_convlag_synin_s",
+        "medium_convlag_synin_s",
+        "medium_obslag_synin_s",
+        "tiny_convlag_synin_ns",
+        "tiny_obslag_synin_ns"
     ]
 }

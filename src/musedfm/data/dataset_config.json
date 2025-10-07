@@ -285,8 +285,8 @@
     ],
     "description": "ICL synthetic data with dynamic column conversion from year/month/day/hour/minute"
   },
-  "kitti": {
-    "timestamp_col": "timestamp",
+  "KITTI": {
+    "timestamp_col": "AUTOMATICALLY GENERATED",
     "target_cols": [
       "target_1",
       "target_2"
@@ -301,7 +301,8 @@
       "track_4_x",
       "track_4_y"
     ],
-    "description": "KITTI dataset with track coordinates and synthetic timestamps"
+    "description": "KITTI dataset with track coordinates and synthetic timestamps",
+    "special_loader": "kitti_special"
   },
   "mds_microgrid": {
     "timestamp_col": "Timestamp",
@@ -649,7 +650,7 @@
     ],
     "description": "Spriteworld vision dataset with multiple target features and complex metadata"
   },
-  "cifar100": {
+  "cifar100_timeseries_csvs": {
     "timestamp_col": "AUTOMATICALLY GENERATED",
     "target_cols": [
       "feature_11"
@@ -669,7 +670,7 @@
     ],
     "description": "CIFAR100 vision dataset with noise level 0.05 and lowpass window 3"
   },
-  "openwebtext": {
+  "openwebtext_timeseries_csvs": {
     "timestamp_col": "AUTOMATICALLY GENERATED",
     "target_cols": [
       "feature_19"
@@ -697,7 +698,7 @@
     ],
     "description": "OpenWebText language dataset with noise level 0.05 and lowpass window 5"
   },
-  "dynamic_data": {
+  "dynamic_data_csvs": {
     "timestamp_col": "Unnamed: 0",
     "target_cols": [
       "target"
@@ -728,7 +729,7 @@
     ],
     "description": "Dynamic data with 210 groups and 22 observation features"
   },
-  "scm_large_convlag_synin_s": {
+  "large_convlag_synin_s": {
     "timestamp_col": "timestamp",
     "target_cols": [
       "target"
@@ -782,7 +783,7 @@
     ],
     "description": "Large synthetic SCM with convolutional lag and synthetic input"
   },
-  "scm_medium_convlag_synin_s": {
+  "medium_convlag_synin_s": {
     "timestamp_col": "timestamp",
     "target_cols": [
       "target"
@@ -821,7 +822,7 @@
     ],
     "description": "Medium synthetic SCM with convolutional lag and synthetic input"
   },
-  "scm_medium_obslag_synin_s": {
+  "medium_obslag_synin_s": {
     "timestamp_col": "timestamp",
     "target_cols": [
       "target"
@@ -860,7 +861,7 @@
     ],
     "description": "Medium synthetic SCM with observation lag and synthetic input"
   },
-  "scm_tiny_convlag_synin_ns": {
+  "tiny_convlag_synin_ns": {
     "timestamp_col": "timestamp",
     "target_cols": [
       "target"
@@ -889,7 +890,7 @@
     ],
     "description": "Tiny synthetic SCM with convolutional lag and synthetic input"
   },
-  "scm_tiny_obslag_synin_ns": {
+  "tiny_obslag_synin_ns": {
     "timestamp_col": "timestamp",
     "target_cols": [
       "target"
@@ -946,8 +947,8 @@
     ],
     "description": "NASDAQ trader stock data with multiple stock features"
   },
-  "mujoco_halfcheetah_v2": {
-    "timestamp_col": "timestamp",
+  "cheetah_csv_out": {
+    "timestamp_col": "datetime",
     "target_cols": [
       "obs_16"
     ],
@@ -968,17 +969,17 @@
       "obs_13",
       "obs_14",
       "obs_15",
-      "obs_17",
-      "obs_18",
-      "obs_19",
-      "obs_20",
-      "obs_21",
-      "obs_22"
+      "act_0",
+      "act_1",
+      "act_2",
+      "act_3",
+      "act_4",
+      "act_5"
     ],
     "description": "Mujoco HalfCheetah V2 RL dataset with 23 observation features"
   },
-  "mujoco_ant_v2": {
-    "timestamp_col": "timestamp",
+  "ant_csv_out": {
+    "timestamp_col": "datetime",
     "target_cols": [
       "obs_26"
     ],
@@ -1096,8 +1097,8 @@
     ],
     "description": "Mujoco Ant V2 RL dataset with 111 observation features"
   },
-  "mujoco_hopper_v2": {
-    "timestamp_col": "timestamp",
+  "hopper_csv_out": {
+    "timestamp_col": "datetime",
     "target_cols": [
       "obs_10"
     ],
@@ -1112,14 +1113,14 @@
       "obs_7",
       "obs_8",
       "obs_9",
-      "obs_11",
-      "obs_12",
-      "obs_13"
+      "act_0",
+      "act_1",
+      "act_2"
     ],
     "description": "Mujoco Hopper V2 RL dataset with 14 observation features"
   },
-  "mujoco_walker2d_v2": {
-    "timestamp_col": "timestamp",
+  "walker2d_csv_out": {
+      "timestamp_col": "datetime",
     "target_cols": [
       "obs_16"
     ],
@@ -1140,11 +1141,12 @@
       "obs_13",
       "obs_14",
       "obs_15",
-      "obs_17",
-      "obs_18",
-      "obs_19",
-      "obs_20",
-      "obs_21"
+      "act_0",
+      "act_1",
+      "act_2",
+      "act_3",
+      "act_4",
+      "act_5"
     ],
     "description": "Mujoco Walker2d V2 RL dataset with 22 observation features"
   },
@@ -1725,7 +1727,7 @@
     "special_loader": "open_aq_special"
   },
   "ercot_load": {
-    "timestamp_col": "Hour_End OR|| HourEnding",
+    "timestamp_col": "INDEX0",
     "target_cols": [
       "INDEX1"
     ],

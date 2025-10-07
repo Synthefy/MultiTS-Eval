@@ -2,18 +2,18 @@
     "domains": [
       {
         "dataset_name": [
-          "SCM_large_convlag_synin_s",
-          "SCM_medium_convlag_synin_s",
-          "SCM_medium_obslag_synin_s",
-          "SCM_tiny_convlag_synin_ns",
-          "SCM_tiny_obslag_synin_ns"
+          "large_convlag_synin_s",
+          "medium_convlag_synin_s",
+          "medium_obslag_synin_s",
+          "tiny_convlag_synin_ns",
+          "tiny_obslag_synin_ns"
         ],
         "domain": "Causal Model",
         "category": "synthetic"
       },
       {
         "dataset_name": [
-          "dynamic_data"
+          "dynamic_data_csvs"
         ],
         "domain": "Dynamic",
         "category": "synthetic"
@@ -103,7 +103,7 @@
       },
       {
         "dataset_name": [
-          "cifar100"
+          "cifar100_timeseries_csvs"
         ],
         "domain": "Image",
         "category": "sequential"
@@ -138,10 +138,10 @@
       },
       {
         "dataset_name": [
-          "mujoco_ant_v2",
-          "mujoco_halfcheetah_v2",
-          "mujoco_hopper_v2",
-          "mujoco_walker2d_v2",
+          "ant_csv_out",
+          "hopper_csv_out",
+          "cheetah_csv_out",
+          "walker2d_csv_out",
           "spriteworld"
         ],
         "domain": "Scientific",
@@ -156,14 +156,14 @@
       },
       {
         "dataset_name": [
-          "openwebtext"
+          "openwebtext_timeseries_csvs"
         ],
         "domain": "Text",
         "category": "sequential"
       },
       {
         "dataset_name": [
-          "kitti"
+          "KITTI"
         ],
         "domain": "Video",
         "category": "sequential"

@@ -14,9 +14,17 @@ Usage:
 """
 
 import time
+import warnings
 import numpy as np
 import argparse
 from pathlib import Path
+
+# Import ConvergenceWarning for proper suppression
+try:
+    from statsmodels.tools.sm_exceptions import ConvergenceWarning
+except ImportError:
+    # Fallback if ConvergenceWarning is not available
+    ConvergenceWarning = Warning
 from musedfm.data import Benchmark
 from musedfm.baselines import (
     MeanForecast, 
@@ -25,9 +33,80 @@ from musedfm.baselines import (
     LinearTrend, 
     ExponentialSmoothing
 )
+
 from musedfm.baselines.linear_regression import LinearRegressionForecast
 from musedfm.plotting import export_metrics_to_csv
+import warnings as w
 
+# Suppress specific statsmodels warnings about ARIMA parameter initialization
+# These warnings occur when ARIMA models encounter non-invertible MA parameters or non-stationary AR parameters
+# during initialization. statsmodels automatically handles this by using zeros as starting parameters,
+# which is a standard fallback approach. The warnings are informational and don't affect model performance.
+warnings.filterwarnings("ignore", 
+                       message="Non-invertible starting MA parameters found. Using zeros as starting parameters.",
+                       category=UserWarning,
+                       module="statsmodels.tsa.statespace.sarimax")
+
+warnings.filterwarnings("ignore", 
+                       message="Non-stationary starting autoregressive parameters found. Using zeros as starting parameters.",
+                       category=UserWarning,
+                       module="statsmodels.tsa.statespace.sarimax")
+
+# Suppress statsmodels convergence warnings
+warnings.filterwarnings("ignore", 
+                       message="Maximum Likelihood optimization failed to",
+                       category=Warning,
+                       module="statsmodels")
+
+# Alternative: suppress all warnings from statsmodels.base.model module
+warnings.filterwarnings("ignore", 
+                       module="statsmodels.base.model")
+
+# Additional suppression for ConvergenceWarning
+warnings.filterwarnings("ignore", 
+                       message="Maximum Likelihood optimization failed to converge. Check mle_retvals",
+                       category=Warning)
+
+# Suppress all ConvergenceWarning instances
+warnings.filterwarnings("ignore", 
+                       message=".*converge.*",
+                       category=Warning,
+                       module="statsmodels")
+
+# Nuclear option: suppress all statsmodels warnings
+warnings.filterwarnings("ignore", 
+                       module="statsmodels")
+
+# Additional targeted suppression for the specific warning
+warnings.filterwarnings("ignore", 
+                       message="Maximum Likelihood optimization failed to converge.\ Check mle_retvals",
+                       category=ConvergenceWarning)
+
+# Suppress ConvergenceWarning from statsmodels.base.model specifically
+warnings.filterwarnings("ignore", 
+                       category=ConvergenceWarning,
+                       module="statsmodels.base.model")
+
+# Additional comprehensive suppression
+warnings.filterwarnings("ignore", 
+                       message="Maximum Likelihood optimization failed to converge. Check mle_retvals",
+                       category=ConvergenceWarning,
+                       module="statsmodels.base.model")
+
+# Suppress all warnings from the specific line that's causing issues
+warnings.filterwarnings("ignore", 
+                       message="Maximum Likelihood optimization failed to converge. Check mle_retvals",
+                       category=Warning)
+
+# Suppress Chronos prediction length warnings
+warnings.filterwarnings("ignore", 
+                       message="We recommend keeping prediction length <= 64. The quality of longer predictions may degrade since the model is not optimized for it.",
+                       category=UserWarning,
+                       module="chronos")
+
+# Suppress all Chronos warnings
+warnings.filterwarnings("ignore", 
+                       module="chronos")
 
 def get_available_models():
     """Get dictionary of available forecasting models.
@@ -86,15 +165,137 @@ def parse_models(model_string):
     return selected_models
 
 
+def _aggregate_metrics(dataset_results, metric_names=['MAPE', 'MAE', 'RMSE', 'NMAE']):
+    """Helper function to aggregate metrics from dataset results."""
+    if not dataset_results:
+        return {}, 0, 0
+    
+    total_windows = sum(result['window_count'] for result in dataset_results)
+    dataset_count = len(dataset_results)
+    
+    avg_metrics = {}
+    for metric in metric_names:
+        values = [result['metrics'][metric] for result in dataset_results if metric in result['metrics']]
+        avg_metrics[metric] = np.mean(values) if values else np.nan
+    
+    return avg_metrics, total_windows, dataset_count
+
+
+def _initialize_nan_tracking():
+    """Initialize NaN tracking statistics for a dataset."""
+    return {
+        'total_windows': 0,
+        'windows_with_nan_history': 0,
+        'windows_with_nan_target': 0,
+        'windows_with_nan_covariates': 0,
+        'windows_with_any_nan': 0,
+        'history_nan_count': 0,
+        'target_nan_count': 0,
+        'covariates_nan_count': 0
+    }
+
+
+def _update_nan_tracking(nan_stats, window_nan_stats):
+    """Update NaN tracking statistics with window-level data."""
+    nan_stats['total_windows'] += 1
+    
+    if window_nan_stats['history_nans'] > 0:
+        nan_stats['windows_with_nan_history'] += 1
+        nan_stats['history_nan_count'] += window_nan_stats['history_nans']
+    
+    if window_nan_stats['target_nans'] > 0:
+        nan_stats['windows_with_nan_target'] += 1
+        nan_stats['target_nan_count'] += window_nan_stats['target_nans']
+    
+    if window_nan_stats['covariates_nans'] > 0:
+        nan_stats['windows_with_nan_covariates'] += 1
+        nan_stats['covariates_nan_count'] += window_nan_stats['covariates_nans']
+    
+    if window_nan_stats['any_nans']:
+        nan_stats['windows_with_any_nan'] += 1
+
+
+def _report_nan_statistics(nan_stats):
+    """Report NaN statistics for a dataset."""
+    if nan_stats['windows_with_any_nan'] > 0:
+        print(f"  ⚠ NaN values detected:")
+        print(f"    Windows with NaN: {nan_stats['windows_with_any_nan']}/{nan_stats['total_windows']}")
+        if nan_stats['windows_with_nan_history'] > 0:
+            print(f"    History NaN: {nan_stats['windows_with_nan_history']} windows, {nan_stats['history_nan_count']} values")
+        if nan_stats['windows_with_nan_target'] > 0:
+            print(f"    Target NaN: {nan_stats['windows_with_nan_target']} windows, {nan_stats['target_nan_count']} values")
+        if nan_stats['windows_with_nan_covariates'] > 0:
+            print(f"    Covariates NaN: {nan_stats['windows_with_nan_covariates']} windows, {nan_stats['covariates_nan_count']} values")
+    else:
+        print(f"  ✓ No NaN values detected in {nan_stats['total_windows']} windows")
+
+
+def _check_window_nan_values(window):
+    """Check for NaN values in a single window and return statistics."""
+    # Check history for NaN values
+    history = window.history()
+    history_nans = np.isnan(history).sum()
+    
+    # Check target for NaN values
+    target = window.target()
+    target_nans = np.isnan(target).sum()
+    
+    # Check covariates for NaN values
+    covariates = window.covariates()
+    covariates_nans = np.isnan(covariates).sum()
+    
+    return {
+        'history_nans': history_nans,
+        'target_nans': target_nans,
+        'covariates_nans': covariates_nans,
+        'any_nans': history_nans > 0 or target_nans > 0 or covariates_nans > 0
+    }
+
+
+def _aggregate_results_by_level(results, models, benchmark, level_name, level_attr):
+    """Helper function to aggregate results by category or domain level."""
+    for model_name in models.keys():
+        # Collect dataset results for this level
+        level_results = []
+        for dataset_result in results[model_name]['dataset_results']:
+            if level_name in dataset_result['dataset_name']:
+                level_results.append(dataset_result)
+        
+        if level_results:
+            avg_metrics, total_windows, dataset_count = _aggregate_metrics(level_results)
+            results[model_name][f'{level_attr}_results'][level_name] = {
+                'metrics': avg_metrics,
+                'window_count': total_windows,
+                'dataset_count': dataset_count
+            }
+        
+        # Process univariate results for multivariate models
+        if not models[model_name]["univariate"]:
+            univariate_model_name = f"{model_name}_univariate"
+            univariate_level_results = []
+            for dataset_result in results[univariate_model_name]['dataset_results']:
+                if level_name in dataset_result['dataset_name']:
+                    univariate_level_results.append(dataset_result)
+            
+            if univariate_level_results:
+                avg_metrics, total_windows, dataset_count = _aggregate_metrics(univariate_level_results)
+                results[univariate_model_name][f'{level_attr}_results'][level_name] = {
+                    'metrics': avg_metrics,
+                    'window_count': total_windows,
+                    'dataset_count': dataset_count
+                }
+
+
 def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int = 100, 
                            collections: str = None, domains: str = None, datasets: str = None,
-                           collect_plot_data: bool = False):
+                           collect_plot_data: bool = False, history_length: int = 512, 
+                           forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False):
     """Run multiple forecasting models on a benchmark and compare their performance."""
     print("=" * 60)
     print("Running Multiple Models on Benchmark")
     print("=" * 60)
     
-    benchmark = Benchmark(benchmark_path, history_length=512, forecast_horizon=128, stride=256)
+    benchmark = Benchmark(benchmark_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached_counts)
     print(f"Loaded benchmark with {len(benchmark)} categories")
     print(f"Running {len(models)} models: {list(models.keys())}")
     
@@ -106,18 +307,23 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
         results[model_name] = {
             'metrics': {},
             'dataset_results': [],
+            'category_results': {},
+            'domain_results': {},
             'time': 0.0,
             'windows': 0
         }
         
-        # Initialize univariate results for all models
-        univariate_model_name = f"{model_name}_univariate"
-        results[univariate_model_name] = {
-            'metrics': {},
-            'dataset_results': [],
-            'time': 0.0,
-            'windows': 0
-        }
+        # Initialize univariate results only for non-univariate models
+        if not models[model_name]["univariate"]:
+            univariate_model_name = f"{model_name}_univariate"
+            results[univariate_model_name] = {
+                'metrics': {},
+                'dataset_results': [],
+                'category_results': {},
+                'domain_results': {},
+                'time': 0.0,
+                'windows': 0
+            }
     
     # Iterate through benchmark structure: category -> domain -> dataset (outer loop)
     dataset_count = 0
@@ -151,30 +357,52 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 # Initialize per-model tracking for this dataset
                 model_dataset_windows = {model_name: 0 for model_name in models.keys()}
                 model_dataset_results = {model_name: [] for model_name in models.keys()}
-                # Add univariate results tracking for all models
+                # Add univariate results tracking only for non-univariate models
                 for model_name, model in models.items():
-                    model_dataset_results[f"{model_name}_univariate"] = []
+                    if not model["univariate"]:
+                        model_dataset_results[f"{model_name}_univariate"] = []
                 model_start_times = {model_name: time.time() for model_name in models.keys()}
+                
+                # Initialize NaN tracking for this dataset
+                nan_stats = _initialize_nan_tracking()
                 
                 for i, window in enumerate(dataset):
                     # Check max_windows per dataset, not overall
                     if max_windows is not None and i >= max_windows:
                         break
                     
+                    # Check for NaN values in this window
+                    window_nan_stats = _check_window_nan_values(window)
+                    _update_nan_tracking(nan_stats, window_nan_stats)
+                    
                     # Process this window with all models
                     for model_name, model in models.items():
-                        # Generate univariate forecast (all models)
                         target_length = len(window.target())
+                        
+                        # Generate multivariate forecast if model supports it (do this first for proper training)
+                        multivariate_forecast = None
+                        if not model["univariate"]:
+                            multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
+                        
+                        # Generate univariate forecast (all models)
                         univariate_forecast = model["model"].forecast(window.history(), None, target_length)
                         
                         # Validate forecast length matches target length
                         if len(univariate_forecast) != target_length:
                             raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {len(univariate_forecast)} values, but target has {target_length} values")
                         
-                        # Generate multivariate forecast if model supports it
-                        multivariate_forecast = None
-                        if not model["univariate"]:
-                            multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
+                        # Plot linear regression fit for first window of linear models (temporary debugging)
+                        # Do this after multivariate forecast to ensure model is trained with covariates
+                        if i == 0 and 'linear' in model_name.lower() and hasattr(model["model"], 'plot_linear_fit'):
+                            print(f"  📊 Plotting linear regression fit for {model_name}...")
+                            try:
+                                model["model"].plot_linear_fit(
+                                    window.history(), 
+                                    window.covariates(),
+                                    save_path=f"/tmp/{model_name}_linear_fit_window_{i}.png"
+                                )
+                            except Exception as e:
+                                print(f"  ⚠ Could not plot linear regression fit: {e}")
                         
                         # Submit both forecasts
                         window.submit_forecast(multivariate_forecast, univariate_forecast)
@@ -260,7 +488,17 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                         
                         print(f"    {univariate_model_name}: {model_dataset_windows[model_name]} windows in {model_elapsed_time:.2f}s")
                 
+                # Report NaN statistics for this dataset
+                _report_nan_statistics(nan_stats)
+                
                 print(f"  Completed dataset {dataset_name}")
+        
+        # Aggregate domain-level metrics for this domain
+        _aggregate_results_by_level(results, models, benchmark, domain.domain_name, 'domain')
+    
+    # Aggregate category-level metrics for each category
+    for category in benchmark:
+        _aggregate_results_by_level(results, models, benchmark, category.category, 'category')
         
     # Calculate overall average metrics across all datasets for each model
     all_model_names = list(models.keys())
@@ -271,13 +509,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
     
     for model_name in all_model_names:
         if results[model_name]['dataset_results']:
-            overall_avg_metrics = {}
-            for metric in ['MAPE', 'MAE', 'RMSE', 'NMAE']:
-                values = [result['metrics'][metric] for result in results[model_name]['dataset_results'] if metric in result['metrics']]
-                if values:
-                    overall_avg_metrics[metric] = np.mean(values)
-                else:
-                    overall_avg_metrics[metric] = np.nan
+            overall_avg_metrics, _, _ = _aggregate_metrics(results[model_name]['dataset_results'])
         else:
             overall_avg_metrics = {}
         
@@ -300,6 +532,17 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
             print(f"  Average MAE: {overall_avg_metrics['MAE']:.4f}")
             print(f"  Average RMSE: {overall_avg_metrics['RMSE']:.4f}")
             print(f"  Average NMAE: {overall_avg_metrics['NMAE']:.4f}")
+        
+        # Display category and domain results
+        for level_name, level_data in [('Category', results[model_name]['category_results']), 
+                                      ('Domain', results[model_name]['domain_results'])]:
+            if level_data:
+                print(f"  {level_name} Results:")
+                for name, data in level_data.items():
+                    metrics = data['metrics']
+                    print(f"    {name}: {data['dataset_count']} datasets, {data['window_count']} windows")
+                    if metrics:
+                        print(f"      MAPE: {metrics['MAPE']:.2f}%, MAE: {metrics['MAE']:.4f}, RMSE: {metrics['RMSE']:.4f}, NMAE: {metrics['NMAE']:.4f}")
     
     if collect_plot_data:
         results['_plot_data'] = plot_data
@@ -331,14 +574,132 @@ def generate_forecast_plots(results: dict, output_dir: str = "/tmp"):
 
 
 
+def _clean_output_directories(output_dir: str):
+    """Clean output directories before generating new CSV files."""
+    import os
+    import shutil
+    
+    directories_to_clean = [
+        os.path.join(output_dir, "categories"),
+        os.path.join(output_dir, "domains"),
+        os.path.join(output_dir, "datasets")
+    ]
+    
+    for directory in directories_to_clean:
+        if os.path.exists(directory):
+            shutil.rmtree(directory)
+            print(f"✓ Cleaned directory: {directory}")
+        os.makedirs(directory, exist_ok=True)
+
+
+def export_hierarchical_results_to_csv(results: dict, output_dir: str = "/tmp"):
+    """Export results organized by category, domain, and dataset levels."""
+    import os
+    import pandas as pd
+    
+    print("\n" + "=" * 60)
+    print("Exporting Hierarchical Results to CSV")
+    print("=" * 60)
+    
+    # Clean output directories first
+    _clean_output_directories(output_dir)
+    
+    # Create output directories
+    category_dir = os.path.join(output_dir, "categories")
+    domain_dir = os.path.join(output_dir, "domains") 
+    dataset_dir = os.path.join(output_dir, "datasets")
+    
+    os.makedirs(category_dir, exist_ok=True)
+    os.makedirs(domain_dir, exist_ok=True)
+    os.makedirs(dataset_dir, exist_ok=True)
+    
+    # Export category-level results
+    for model_name, model_results in results.items():
+        if 'category_results' in model_results and model_results['category_results']:
+            category_data = []
+            for category_name, category_info in model_results['category_results'].items():
+                row = {
+                    'model': model_name,
+                    'category': category_name,
+                    'datasets': category_info['dataset_count'],
+                    'windows': category_info['window_count'],
+                    **category_info['metrics']
+                }
+                category_data.append(row)
+            
+            if category_data:
+                df = pd.DataFrame(category_data)
+                df.to_csv(os.path.join(category_dir, f"{model_name}_category_results.csv"), index=False)
+                print(f"✓ Category results saved: {model_name}_category_results.csv")
+    
+    # Export domain-level results
+    for model_name, model_results in results.items():
+        if 'domain_results' in model_results and model_results['domain_results']:
+            domain_data = []
+            for domain_name, domain_info in model_results['domain_results'].items():
+                row = {
+                    'model': model_name,
+                    'domain': domain_name,
+                    'datasets': domain_info['dataset_count'],
+                    'windows': domain_info['window_count'],
+                    **domain_info['metrics']
+                }
+                domain_data.append(row)
+            
+            if domain_data:
+                df = pd.DataFrame(domain_data)
+                df.to_csv(os.path.join(domain_dir, f"{model_name}_domain_results.csv"), index=False)
+                print(f"✓ Domain results saved: {model_name}_domain_results.csv")
+    
+    # Export dataset-level results
+    for model_name, model_results in results.items():
+        if 'dataset_results' in model_results and model_results['dataset_results']:
+            dataset_data = []
+            for dataset_info in model_results['dataset_results']:
+                row = {
+                    'model': model_name,
+                    'dataset': dataset_info['dataset_name'],
+                    'windows': dataset_info['window_count'],
+                    **dataset_info['metrics']
+                }
+                dataset_data.append(row)
+            
+            if dataset_data:
+                df = pd.DataFrame(dataset_data)
+                df.to_csv(os.path.join(dataset_dir, f"{model_name}_dataset_results.csv"), index=False)
+                print(f"✓ Dataset results saved: {model_name}_dataset_results.csv")
+    
+    print(f"\nHierarchical CSV files saved to:")
+    print(f"  Categories: {category_dir}/")
+    print(f"  Domains: {domain_dir}/")
+    print(f"  Datasets: {dataset_dir}/")
+
 def export_results_to_csv(benchmark_path: str, models: dict, max_windows: int = None, output_dir: str = "/tmp",
-                         collections: str = None, domains: str = None, datasets: str = None):
+                         collections: str = None, domains: str = None, datasets: str = None,
+                         history_length: int = 512, forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False):
     """Export forecast results to CSV files."""
+    import os
+    import glob
+    
     print("\n" + "=" * 60)
     print("Exporting Results to CSV")
     print("=" * 60)
     
-    benchmark = Benchmark(benchmark_path, history_length=10, forecast_horizon=5, stride=1)
+    # Clean existing CSV files in output directory
+    csv_patterns = [
+        os.path.join(output_dir, "musedfm_results*.csv"),
+        os.path.join(output_dir, "*_results.csv")
+    ]
+    
+    for pattern in csv_patterns:
+        for csv_file in glob.glob(pattern):
+            try:
+                os.remove(csv_file)
+                print(f"✓ Cleaned CSV file: {os.path.basename(csv_file)}")
+            except OSError as e:
+                print(f"Warning: Could not remove {csv_file}: {e}")
+    
+    benchmark = Benchmark(benchmark_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached_counts)
     
     # Process windows with the first model (for CSV export, we only need one model's forecasts)
     first_model = next(iter(models.values()))["model"]
@@ -521,6 +882,33 @@ Examples:
         help="Output directory for plots and CSV files (default: /tmp)"
     )
     
+    parser.add_argument(
+        "--history-length",
+        type=int,
+        default=512,
+        help="History length for windows (default: 512)"
+    )
+    
+    parser.add_argument(
+        "--forecast-horizon",
+        type=int,
+        default=128,
+        help="Forecast horizon for windows (default: 128)"
+    )
+    
+    parser.add_argument(
+        "--stride",
+        type=int,
+        default=256,
+        help="Stride between windows (default: 256)"
+    )
+    
+    parser.add_argument(
+        "--load-cached-counts",
+        action="store_true",
+        help="Load window counts from cached JSON files instead of generating"
+    )
+    
     args = parser.parse_args()
     
     print("MUSED-FM Example: Multiple Model Forecasting")
@@ -551,10 +939,13 @@ Examples:
     # Run models on benchmark
     results = run_models_on_benchmark(args.benchmark_path, models, args.windows, 
                                      collections=collections, domains=domains, datasets=datasets,
-                                     collect_plot_data=args.plots)
+                                     collect_plot_data=args.plots, history_length=args.history_length,
+                                     forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts)
     
     # Compare performance
     compare_model_performance(results)
+    # Export hierarchical CSV results
+    export_hierarchical_results_to_csv(results, output_dir=args.output_dir)
     
     # Generate plots if requested
     if args.plots and '_plot_data' in results:
@@ -563,7 +954,8 @@ Examples:
     # Export CSV if requested
     if args.csv:
         export_results_to_csv(args.benchmark_path, models, max_windows=args.windows, output_dir=args.output_dir,
-                             collections=collections, domains=domains, datasets=datasets)
+                             collections=collections, domains=domains, datasets=datasets,
+                             history_length=args.history_length, forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts)
     
     total_time = time.time() - start_time
     print(f"\nTotal execution time: {total_time:.2f} seconds")

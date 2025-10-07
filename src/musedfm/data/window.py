@@ -3,7 +3,7 @@ Window class representing a single evaluation unit.
 """
 
 import numpy as np
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 from ..metrics import evaluate_metrics
 
 
@@ -13,18 +13,20 @@ class Window:
     Stores ground truth and submitted forecast.
     """
     
-    def __init__(self, history: np.ndarray, target: np.ndarray, covariates: np.ndarray):
+    def __init__(self, history: np.ndarray, target: np.ndarray, covariates: np.ndarray, timestamps: Optional[np.ndarray] = None):
         """
-        Initialize a window with history, target, and covariates.
+        Initialize a window with history, target, covariates, and timestamps.
         
         Args:
             history: Historical data for forecasting
             target: Ground truth target values
             covariates: Additional covariate data
+            timestamps: Timestamp data for the window (optional)
         """
         self._history = history.copy()
         self._target = target.copy()
         self._covariates = covariates.copy()
+        self._timestamps = timestamps.copy() if timestamps is not None else None
         self._forecast: Optional[np.ndarray] = None
         self._evaluation_results: Optional[Dict[str, float]] = None
     
@@ -39,6 +41,10 @@ class Window:
     def covariates(self) -> np.ndarray:
         """Return the covariate data."""
         return self._covariates.copy()
+    
+    def timestamps(self) -> Optional[np.ndarray]:
+        """Return the timestamp data."""
+        return self._timestamps.copy() if self._timestamps is not None else None
     
     def submit_forecast(self, multivariate_forecast: Optional[np.ndarray]=None, univariate_forecast: Optional[np.ndarray] = None) -> None:
         """
@@ -107,3 +113,36 @@ class Window:
     def is_univariate(self) -> bool:
         """Check if the primary forecast is univariate."""
         return getattr(self, '_is_univariate', False)
+    
+    @property
+    def has_timestamps(self) -> bool:
+        """Check if timestamps are available."""
+        return self._timestamps is not None
+    
+    def replace_nan_with_nanmean(self) -> None:
+        """
+        Replace NaN values with nanmean in history, forecast, and covariates.
+        
+        This method modifies the internal data arrays in-place by replacing
+        any NaN values with the nanmean of the respective array.
+        """
+        # Replace NaN values in history
+        if np.any(np.isnan(self._history)):
+            nanmean_history = np.nanmean(self._history)
+            self._history = np.where(np.isnan(self._history), nanmean_history, self._history)
+        
+        # Replace NaN values in covariates
+        if np.any(np.isnan(self._covariates)):
+            nanmean_covariates = np.nanmean(self._covariates)
+            self._covariates = np.where(np.isnan(self._covariates), nanmean_covariates, self._covariates)
+        
+        # Replace NaN values in forecast if it exists
+        if self._forecast is not None and np.any(np.isnan(self._forecast)):
+            nanmean_forecast = np.nanmean(self._forecast)
+            self._forecast = np.where(np.isnan(self._forecast), nanmean_forecast, self._forecast)
+        
+        # Replace NaN values in timestamps if they exist and are numeric
+        if self._timestamps is not None and np.issubdtype(self._timestamps.dtype, np.number):
+            if np.any(np.isnan(self._timestamps)):
+                nanmean_timestamps = np.nanmean(self._timestamps)
+                self._timestamps = np.where(np.isnan(self._timestamps), nanmean_timestamps, self._timestamps)

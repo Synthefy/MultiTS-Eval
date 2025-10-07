@@ -2,12 +2,12 @@
 Baseline forecasting methods for MUSED-FM evaluation.
 """
 
-from .base_forecaster import BaseForecaster
-from .mean_forecast import MeanForecast
-from .historical_inertia import HistoricalInertia
-from .arima_forecast import ARIMAForecast
-from .linear_trend import LinearTrend
-from .exponential_smoothing import ExponentialSmoothing
+from musedfm.baselines.base_forecaster import BaseForecaster
+from musedfm.baselines.mean_forecast import MeanForecast
+from musedfm.baselines.historical_inertia import HistoricalInertia
+from musedfm.baselines.arima_forecast import ARIMAForecast
+from musedfm.baselines.linear_trend import LinearTrend
+from musedfm.baselines.exponential_smoothing import ExponentialSmoothing
 
 __all__ = [
     'BaseForecaster',

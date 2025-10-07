@@ -5,7 +5,7 @@ Mean forecast baseline for MUSED-FM evaluation.
 import numpy as np
 import pandas as pd
 from typing import Optional
-from .base_forecaster import BaseForecaster
+from musedfm.baselines.base_forecaster import BaseForecaster
 
 
 class MeanForecast(BaseForecaster):

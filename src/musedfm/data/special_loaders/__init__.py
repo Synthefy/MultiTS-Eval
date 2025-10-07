@@ -5,6 +5,6 @@ These loaders handle datasets with unique data formats or structures that
 cannot be processed using the standard parquet file loading approach.
 """
 
-from .open_aq_special import OpenAQSpecialLoader
+from musedfm.data.special_loaders.open_aq_special import OpenAQSpecialLoader
 
 __all__ = ['OpenAQSpecialLoader']

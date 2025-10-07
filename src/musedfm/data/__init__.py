@@ -2,10 +2,10 @@
 Data loading and evaluation components for MUSED-FM.
 """
 
-from .window import Window
-from .dataset import Dataset
-from .domain import Domain
-from .category import Category
-from .benchmark import Benchmark
+from musedfm.data.window import Window
+from musedfm.data.dataset import Dataset
+from musedfm.data.domain import Domain
+from musedfm.data.category import Category
+from musedfm.data.benchmark import Benchmark
 
 __all__ = ['Window', 'Dataset', 'Domain', 'Category', 'Benchmark']

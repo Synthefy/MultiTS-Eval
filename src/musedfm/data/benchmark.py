@@ -5,8 +5,8 @@ Benchmark class as top-level container for multiple categories.
 import json
 from typing import Iterator, Dict, Any, List, Optional, Union
 from pathlib import Path
-from .category import Category
-from .dataset import Dataset
+from musedfm.data.category import Category
+from musedfm.data.dataset import Dataset
 from collections import OrderedDict
 
 
@@ -16,7 +16,7 @@ class Benchmark:
     Simple orchestrator for evaluations and exports.
     """
     
-    def __init__(self, benchmark_path: str, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1):
+    def __init__(self, benchmark_path: str, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False):
         """
         Initialize benchmark from directory containing multiple category directories.
         
@@ -25,17 +25,24 @@ class Benchmark:
             history_length: Number of historical points to use for forecasting
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
+            load_cached_counts: If True, load window counts from cached JSON files instead of generating
         """
         self.benchmark_path = Path(benchmark_path)
         self.history_length = history_length
         self.forecast_horizon = forecast_horizon
         self.stride = stride
+        self.load_cached_counts = load_cached_counts
         self.categories: List[Category] = []
         self._data_hierarchy = self._load_data_hierarchy()
         self.category_names = OrderedDict()
         self.dataset_domain_map = OrderedDict()
         self.dataset_category_map = OrderedDict()
         self._load_categories()
+        self.domain_dataset_map = OrderedDict()
+        for key,value in self.dataset_domain_map.items():
+            if value not in self.domain_dataset_map:
+                self.domain_dataset_map[value] = []
+            self.domain_dataset_map[value].append(key)
     
     def _load_data_hierarchy(self) -> Dict[str, Any]:
         """Load the data hierarchy from data_hierarchy.json."""
@@ -84,7 +91,7 @@ class Benchmark:
         
         self.categories = OrderedDict()
         for category_path in category_candidates:
-            category = Category(str(category_path), self.dataset_domain_map, self.dataset_category_map, self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride)
+            category = Category(str(category_path), self.dataset_domain_map, self.dataset_category_map, self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, self.load_cached_counts)
             self.categories[category.category] = category
         
         self.dataset_filepaths = sum([cat.dataset_filepaths for cat in self.categories.values()], [])

@@ -4,7 +4,7 @@ Historical inertia baseline for MUSED-FM evaluation.
 
 import numpy as np
 from typing import Optional
-from .base_forecaster import BaseForecaster
+from musedfm.baselines.base_forecaster import BaseForecaster
 
 
 class HistoricalInertia(BaseForecaster):
