@@ -112,6 +112,7 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
     # Process this window with all models
     for model_name, model in models.items():
         target_length = len(window.target())
+        print(window.covariates().shape)
         
         # Generate multivariate forecast if model supports it (do this first for proper training)
         multivariate_forecast = None
@@ -224,7 +225,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                            categories: str = None, domains: str = None, datasets: str = None,
                            collect_plot_data: bool = False, history_length: int = 512, 
                            forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False,
-                           num_plots_to_keep: int = 1):
+                           num_plots_to_keep: int = 1, debug_mode: bool = False):
     """Run multiple forecasting models on a benchmark and compare their performance."""
     print("=" * 60)
     print("Running Multiple Models on Benchmark")
@@ -306,7 +307,8 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                         window, models, model_dataset_results, model_dataset_windows, 
                         results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=num_plots_to_keep
                     )
-                    _update_nan_tracking(nan_stats, window_nan_stats)
+                    if debug_mode: 
+                        _update_nan_tracking(nan_stats, window_nan_stats)
                 
                 # Calculate average metrics and store results for each model
                 for model_name in models.keys():
@@ -323,8 +325,9 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                     model_elapsed_time = time.time() - model_start_times[model_name]
                     results[model_name]['time'] += model_elapsed_time
                     
-                    debug_model_performance(model_name, dataset_avg_metrics, model_dataset_windows, model_elapsed_time)
-                    plot_high_mape_windows(model_name, dataset_name, dataset, models[model_name], dataset_avg_metrics)
+                    if debug_mode:
+                        debug_model_performance(model_name, dataset_avg_metrics, model_dataset_windows, model_elapsed_time)
+                        plot_high_mape_windows(model_name, dataset_name, dataset, models[model_name], dataset_avg_metrics)
                 
                 # Process univariate results for multivariate models only
                 for model_name, model in models.items():
@@ -333,11 +336,12 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                         model_elapsed_time, dataset_name, results
                     )
                     
-                    if univariate_model_name is not None:
+                    if univariate_model_name is not None and debug_mode:
                         plot_high_mape_univariate_windows(univariate_model_name, dataset_name, dataset, model, univariate_avg_metrics)
                 
                 # Report NaN statistics for this dataset
-                _report_nan_statistics(nan_stats)
+                if debug_mode:
+                    _report_nan_statistics(nan_stats)
                 
                 print(f"  Completed dataset {dataset_name}")
         
@@ -362,7 +366,8 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
             overall_avg_metrics = {}
         
         results[model_name]['metrics'] = overall_avg_metrics
-        debug_model_summary(model_name, results, models)
+        if debug_mode:
+            debug_model_summary(model_name, results, models)
     
     if collect_plot_data:
         results['_plot_data'] = plot_data
@@ -567,6 +572,12 @@ Examples:
         action="store_true",
         help="Load window counts from cached JSON files instead of generating"
     )
+
+    parser.add_argument(
+        "--debug-mode",
+        action="store_true",
+        help="Enable debug mode"
+    )
     
     args = parser.parse_args()
     
@@ -599,7 +610,8 @@ Examples:
     results = run_models_on_benchmark(args.benchmark_path, models, args.windows, 
                                      categories=categories, domains=domains, datasets=datasets,
                                      collect_plot_data=args.plots, history_length=args.history_length,
-                                     forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts)
+                                     forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts,
+                                     debug_mode=args.debug_mode)
     
     # Compare performance
     compare_model_performance(results)

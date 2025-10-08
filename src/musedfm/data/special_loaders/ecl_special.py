@@ -8,7 +8,6 @@ import numpy as np
 import random
 from pathlib import Path
 from typing import List, Dict, Any
-from musedfm.data.window import Window
 
 
 class ECLSpecialLoader:
@@ -68,8 +67,7 @@ class ECLSpecialLoader:
 
         return df
 
-    def _create_chunks_and_windows(self, df: pd.DataFrame, history_length: int = 30, 
-                                 forecast_horizon: int = 1, stride: int = 1) -> List[Window]:
+    def _create_chunks(self, df: pd.DataFrame, chunk_size: int = 2048) -> List[pd.DataFrame]:
         """Create chunks and windows from the dataframe."""
         if len(df) == 0:
             return []
@@ -79,80 +77,26 @@ class ECLSpecialLoader:
             col for col in df.columns if col not in ["datetime", "MT_001"]
         ]
 
-        # Subdivide the dataframe into 1024 length chunks
-        df_chunks = [df.iloc[i : i + 1024] for i in range(0, len(df), 1024)]
+        # Subdivide the dataframe into 2048 length chunks
+        df_chunks = [df.iloc[i : i + chunk_size] for i in range(0, len(df), int(chunk_size / 4))]
         if self.random_ordering:
             random.shuffle(df_chunks)
 
-        all_windows = []
+        all_chunks = []
         for chunk in df_chunks:
+            if len(chunk) <= 40:
+                continue
+
             # Sample 50 random metadata columns
             if len(metadata_cols) >= 50:
                 sampled_cols = random.sample(metadata_cols, 50)
             else:
                 sampled_cols = metadata_cols  # Use all available if less than 50
-
-            # Create subchunk with sampled columns
+            
             subchunk = chunk[["datetime"] + sampled_cols + target_cols]
+            all_chunks.append(subchunk)
 
-            # Drop all NaN columns after window region selection
-            subchunk = subchunk.dropna(axis=1, how='all')
-
-            # Create windows from this chunk
-            windows = self._create_windows_from_chunk(
-                subchunk, history_length, forecast_horizon, stride
-            )
-            all_windows.extend(windows)
-
-        return all_windows
-
-    def _create_windows_from_chunk(self, chunk: pd.DataFrame, history_length: int,
-                                 forecast_horizon: int, stride: int) -> List[Window]:
-        """Create windows from a single chunk."""
-        if len(chunk) < history_length + forecast_horizon:
-            return []
-
-        # Get target and metadata columns
-        target_col = "MT_001"
-        metadata_cols = [col for col in chunk.columns if col not in ["datetime", "MT_001"]]
-        
-        if target_col not in chunk.columns:
-            return []
-
-        # Extract time series data
-        target_series = chunk[target_col].values
-        if metadata_cols:
-            covariate_data = chunk[metadata_cols].values
-        else:
-            covariate_data = np.zeros((len(chunk), 1))
-
-        # Extract timestamp data
-        timestamp_data = chunk["datetime"].values
-
-        # Create sliding windows
-        windows = []
-        data_length = len(target_series)
-        
-        for start_idx in range(0, data_length - history_length - forecast_horizon + 1, stride):
-            history_end = start_idx + history_length
-            target_start = history_end
-            target_end = target_start + forecast_horizon
-
-            history = target_series[start_idx:history_end]
-            target = target_series[target_start:target_end]
-            covariates = covariate_data[start_idx:history_end]
-
-            # Skip windows where target is completely NaN
-            if np.all(np.isnan(target)) or np.all(np.isnan(history)):
-                continue
-
-            # Extract timestamps for this window
-            timestamps = timestamp_data[start_idx:target_end]
-
-            window = Window(history, target, covariates, timestamps)
-            windows.append(window)
-
-        return windows
+        return all_chunks
 
     def load_all_data(self) -> List[pd.DataFrame]:
         """
@@ -167,10 +111,10 @@ class ECLSpecialLoader:
 
         for file_path in self.parquet_files:
             df = self._load_and_preprocess_data(file_path)
-            if len(df) > 0:
-                all_dataframes.append(df)
+            chunks = self._create_chunks(df)
+            all_dataframes.extend(chunks)
 
-        print(f"Successfully loaded {len(all_dataframes)} valid files")
+        print(f"Successfully loaded {len(all_dataframes)} valid chunks")
         return all_dataframes
 
     def get_dataset_config(self) -> Dict[str, Any]:
