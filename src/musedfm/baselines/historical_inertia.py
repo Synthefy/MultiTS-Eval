@@ -28,6 +28,9 @@ class HistoricalInertia(BaseForecaster):
         if forecast_horizon is None:
             forecast_horizon = 1
         
+        # filter history with nanmean
+        history[np.isnan(history)] = np.nanmean(history)
+
         # Use minimum of forecast horizon or history length
         inertia_length = min(forecast_horizon, len(history))
         

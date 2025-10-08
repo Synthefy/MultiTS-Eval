@@ -36,6 +36,9 @@ class ExponentialSmoothing(BaseForecaster):
         if forecast_horizon is None:
             forecast_horizon = 1
         
+        # filter history with nanmean
+        history[np.isnan(history)] = np.nanmean(history)
+
         if len(history) < 2:
             return np.full(forecast_horizon, history[0])
         

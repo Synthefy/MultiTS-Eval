@@ -73,11 +73,16 @@ class LinearRegressionForecast:
         # Handle NaN values in covariates
         if covariates is not None and np.any(np.isnan(covariates)):
             # Replace NaN values with mean for each covariate column (handle empty slice case)
-            # Check if any columns are entirely NaN to avoid empty slice warning
-            nan_means = np.nanmean(covariates, axis=0)
-            # Replace NaN means (from entirely NaN columns) with 0
-            nan_means = np.nan_to_num(nan_means, nan=0.0)
-            covariates = np.nan_to_num(covariates, nan=nan_means)
+            for col in range(covariates.shape[1]):
+                if np.all(np.isnan(covariates[:, col])):
+                    covariates[:, col] = 0.0
+                else:
+                    covariates[:, col] = np.nan_to_num(covariates[:, col], nan=np.nanmean(covariates[:, col]))
+            # # Check if any columns are entirely NaN to avoid empty slice warning
+            # nan_means = np.nanmean(covariates, axis=0)
+            # # Replace NaN means (from entirely NaN columns) with 0
+            # nan_means = np.nan_to_num(nan_means, nan=0.0)
+            # covariates = np.nan_to_num(covariates, nan=nan_means)
 
         
         # Prepare features for regression
@@ -102,11 +107,9 @@ class LinearRegressionForecast:
         
         # Train linear regression model only if not already trained with same dimensions
         if not hasattr(self, 'model') or self.model is None or not hasattr(self.model, 'coef_') or self.model.coef_.shape[0] != X.shape[1]:
-            print(f"Debug: Training model with {X.shape[1]} features")
+            # print(f"Debug: Training model with {X.shape[1]} features")
             self.model = LinearRegression()
             self.model.fit(X, y)
-        else:
-            print(f"Debug: Reusing existing model with {self.model.coef_.shape[0]} features")
         
         # Store history info for plotting
         self.history_mean = np.mean(history)
@@ -166,11 +169,6 @@ class LinearRegressionForecast:
             print("Insufficient history for plotting")
             return
         
-        # Debug: Check model dimensions
-        print(f"Debug: Model expects {self.model.coef_.shape[0]} features")
-        print(f"Debug: History length: {len(history)}")
-        print(f"Debug: Covariates shape: {covariates.shape if covariates is not None else 'None'}")
-        
         # Generate predictions using the trained model
         # Prepare features the same way as in training
         if covariates is not None and len(covariates) > 0:
@@ -189,8 +187,6 @@ class LinearRegressionForecast:
         else:
             # Use only time indices if no covariates
             X = np.arange(len(history)).reshape(-1, 1)
-        
-        print(f"Debug: Prepared X shape: {X.shape}")
         
         predictions = self.model.predict(X)
         

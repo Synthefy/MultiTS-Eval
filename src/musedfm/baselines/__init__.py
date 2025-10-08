@@ -8,6 +8,7 @@ from musedfm.baselines.historical_inertia import HistoricalInertia
 from musedfm.baselines.arima_forecast import ARIMAForecast
 from musedfm.baselines.linear_trend import LinearTrend
 from musedfm.baselines.exponential_smoothing import ExponentialSmoothing
+from musedfm.baselines.linear_regression import LinearRegressionForecast
 
 __all__ = [
     'BaseForecaster',
@@ -15,5 +16,6 @@ __all__ = [
     'HistoricalInertia',
     'ARIMAForecast',
     'LinearTrend',
-    'ExponentialSmoothing'
+    'ExponentialSmoothing',
+    'LinearRegressionForecast'
 ]

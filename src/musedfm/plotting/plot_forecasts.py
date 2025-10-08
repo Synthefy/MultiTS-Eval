@@ -14,7 +14,8 @@ def plot_window_forecasts(
     forecasts: Dict[str, np.ndarray],
     title: Optional[str] = None,
     figsize: tuple = (12, 6),
-    save_path: Optional[str] = None
+    save_path: Optional[str] = None,
+    show_plot: bool = False
 ) -> None:
     """
     Plot a window with its history, target, and multiple forecasts.
@@ -42,8 +43,14 @@ def plot_window_forecasts(
     plt.plot(target_indices, target, 'g-', linewidth=2, label='Target', alpha=0.8)
     
     # Plot forecasts
-    colors = ['red', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+    colors = ['red', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan', 'black', 'yellow']
     for i, (baseline_name, forecast) in enumerate(forecasts.items()):
+        print(baseline_name, forecast)
+        # Skip None forecasts
+        if forecast is None:
+            print(f"Warning: Skipping {baseline_name} forecast (None)")
+            continue
+            
         color = colors[i % len(colors)]
         forecast_indices = np.arange(len(history), len(history) + len(forecast))
         plt.plot(forecast_indices, forecast, '--', color=color, linewidth=2, 
@@ -53,10 +60,10 @@ def plot_window_forecasts(
     plt.axvline(x=len(history) - 0.5, color='black', linestyle=':', alpha=0.5)
     
     # Customize plot
-    plt.xlabel('Time Steps')
-    plt.ylabel('Value')
-    plt.title(title or 'Window History, Target, and Forecasts')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.xlabel('Time Steps', fontsize=18)
+    plt.ylabel('Value', fontsize=18)
+    plt.title(title or 'Window History, Target, and Forecasts', fontsize=28)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=14)
     plt.grid(True, alpha=0.3)
     
     # Add text annotation for the separation line
@@ -73,8 +80,11 @@ def plot_window_forecasts(
         
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Plot saved to: {save_path}")
-    
-    plt.show()
+    if show_plot:
+        plt.show()
+        return plt
+    else:
+        plt.close()
 
 
 def plot_multiple_windows(
@@ -160,7 +170,9 @@ def plot_multiple_windows(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Multi-window plot saved to: {save_path}")
     
+        plt.close()
     plt.show()
+    return plt
 
 
 def plot_baseline_comparison(
@@ -241,7 +253,10 @@ def plot_baseline_comparison(
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Comparison plot saved to: {save_path}")
     
-    plt.show()
+        plt.close()
+    else:
+        plt.show()
+        return plt
 
 
 def export_metrics_to_csv(

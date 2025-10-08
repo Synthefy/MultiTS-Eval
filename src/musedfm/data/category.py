@@ -189,17 +189,21 @@ class Category:
         if os.path.exists(compressed_tar_path):
             os.makedirs(compressed_tar_path, exist_ok=True)
             shutil.copy2(json_path, os.path.join(compressed_tar_path, filename))
+        return window_counts
     
     def load_window_counts(self, base_path: str = "/workspace/data/fm_eval_nested") -> Dict[str, int]:
         """Load window counts from JSON file if present."""
         filename = f"{self.category}_window_counts_h{self.history_length}_f{self.forecast_horizon}_s{self.stride}.json"
         json_path = os.path.join(base_path, filename)
-        
+
         if os.path.exists(json_path):
             with open(json_path, 'r') as f:
                 return json.load(f)
-        return {}
-    
+        else:
+            self.get_window_counts(use_cached=False, base_path=base_path)
+            window_counts = self.save_window_counts(base_path)
+            return window_counts
+
     def get_window_counts(self, use_cached: bool = True, base_path: str = "/workspace/data/fm_eval_nested") -> Dict[str, int]:
         """Get window counts, optionally from cached JSON file."""
         if use_cached:

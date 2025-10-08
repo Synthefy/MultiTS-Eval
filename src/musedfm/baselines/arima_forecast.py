@@ -39,6 +39,9 @@ class ARIMAForecast(BaseForecaster):
         
         from statsmodels.tsa.arima.model import ARIMA
         
+        # filter history with nanmean
+        history[np.isnan(history)] = np.nanmean(history)
+
         # Fit ARIMA model
         model = ARIMA(history, order=self.order)
         fitted_model = model.fit()

@@ -10,11 +10,11 @@ import random
 from datetime import datetime, timedelta
 from typing import List, Iterator, Dict, Any, Optional, Union
 from pathlib import Path
-import os
 from musedfm.data.window import Window
 
 from musedfm.data.special_loaders.open_aq_special import OpenAQSpecialLoader
 from musedfm.data.special_loaders.kitti_special import KITTISpecialLoader
+from musedfm.data.special_loaders.ecl_special import ECLSpecialLoader
 
 
 class Dataset:
@@ -343,6 +343,8 @@ class Dataset:
             special_loader = OpenAQSpecialLoader(data_path)
         elif special_loader_name == 'kitti_special':
             special_loader = KITTISpecialLoader(data_path)
+        elif special_loader_name == 'ecl_special':
+            special_loader = ECLSpecialLoader(data_path)
         else:
             raise ValueError(f"Unknown special loader: {special_loader_name}")
             
@@ -510,7 +512,7 @@ class Dataset:
         updated_metadata_cols = [col for col in metadata_cols if col in df_cleaned.columns]
         
         # Remove trailing and preceding NaNs from each column
-        for col in df_cleaned.columns:
+        for col in target_cols:
             if col != timestamp_col:  # Don't modify timestamp column
                 # Find first and last non-NaN values
                 first_valid = df_cleaned[col].first_valid_index()
@@ -682,11 +684,13 @@ class Dataset:
                 history = target_series[start_idx:history_end]
                 target = target_series[target_start:target_end]
                 covariates = covariate_data[start_idx:history_end]
+
                 
                 # Skip windows where target is completely NaN
                 if np.all(np.isnan(target)) or np.all(np.isnan(history)):
                     print(f"Skipping window with completely NaN target: {start_idx}")
                     continue
+                # print(f"Window with no NaN target: {start_idx} mean: {np.nanmean(target)} variance: {np.nanstd(target)} num nan: {np.isnan(target).sum()}")
                 
                 # Extract timestamps for this window if available
                 timestamps = None
@@ -746,7 +750,6 @@ class Dataset:
             target_cols,
         )
         df, updated_target_cols, updated_covariate_cols = self._clean_numeric_columns(df, timestamp_col, target_cols, covariate_cols)
-        
         # Update the column lists to reflect dropped columns
         target_cols = updated_target_cols
         covariate_cols = updated_covariate_cols

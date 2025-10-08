@@ -24,6 +24,9 @@ class LinearTrend(BaseForecaster):
         Returns:
             Linear trend forecast
         """
+        # filter history with nanmean
+        history[np.isnan(history)] = np.nanmean(history)
+
         if forecast_horizon is None:
             forecast_horizon = 1
         

@@ -181,7 +181,8 @@
     "metadata_cols": [
       "ALL EXCEPT TS TARGET"
     ],
-    "description": "ECL data with European decimal format handling, chunked processing"
+    "description": "ECL data with European decimal format handling, chunked processing, and random column sampling",
+    "special_loader": "ecl_special"
   },
   "europe_electricity": {
     "timestamp_col": "Date",

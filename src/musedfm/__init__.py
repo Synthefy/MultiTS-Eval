@@ -6,6 +6,7 @@ from musedfm.data import Window, Dataset, Domain, Category, Benchmark
 from musedfm import metrics
 from musedfm import baselines
 from musedfm import plotting
+from musedfm import examples
 
 __version__ = "1.0.0"
-__all__ = ['Window', 'Dataset', 'Domain', 'Category', 'Benchmark', 'metrics', 'baselines', 'plotting']
+__all__ = ['Window', 'Dataset', 'Domain', 'Category', 'Benchmark', 'metrics', 'baselines', 'plotting', 'examples']
