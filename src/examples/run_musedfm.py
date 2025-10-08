@@ -104,7 +104,7 @@ def suppress_all_warnings():
 
 
 def _process_window_with_models(window, models, model_dataset_results, model_dataset_windows, 
-                               results, collect_plot_data, plot_data, dataset_name):
+                               results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=1):
     """Process a single window with all models."""
     # Check for NaN values in this window
     window_nan_stats = _check_window_nan_values(window)
@@ -156,8 +156,7 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
                 model_dataset_results[f"{model_name}_univariate"].append(univariate_results)
         
         # Collect data for plotting if requested
-        print("collecting plotting data", collect_plot_data and model_dataset_windows[model_name] < 3, results[model_name]['windows'], len(plot_data))
-        if collect_plot_data and model_dataset_windows[model_name] < 3:  # Only collect first 3 windows for plotting
+        if collect_plot_data and model_dataset_windows[model_name] < num_plots_to_keep:  # Only collect first 3 windows for plotting
             plot_data.append({
                 'window': window,
                 'forecast': multivariate_forecast,
@@ -224,7 +223,8 @@ def _process_univariate_results(model_name, model, model_dataset_results, model_
 def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int = 100, 
                            categories: str = None, domains: str = None, datasets: str = None,
                            collect_plot_data: bool = False, history_length: int = 512, 
-                           forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False):
+                           forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False,
+                           num_plots_to_keep: int = 1):
     """Run multiple forecasting models on a benchmark and compare their performance."""
     print("=" * 60)
     print("Running Multiple Models on Benchmark")
@@ -304,7 +304,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                     # Process this window with all models
                     window_nan_stats = _process_window_with_models(
                         window, models, model_dataset_results, model_dataset_windows, 
-                        results, collect_plot_data, plot_data, dataset_name
+                        results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=num_plots_to_keep
                     )
                     _update_nan_tracking(nan_stats, window_nan_stats)
                 

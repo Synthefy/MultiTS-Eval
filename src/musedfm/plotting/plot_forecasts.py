@@ -45,7 +45,6 @@ def plot_window_forecasts(
     # Plot forecasts
     colors = ['red', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan', 'black', 'yellow']
     for i, (baseline_name, forecast) in enumerate(forecasts.items()):
-        print(baseline_name, forecast)
         # Skip None forecasts
         if forecast is None:
             print(f"Warning: Skipping {baseline_name} forecast (None)")

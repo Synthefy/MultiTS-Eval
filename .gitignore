@@ -185,3 +185,5 @@ cython_debug/
 *.parquet
 uv.lock
 *.txt
+*.png
+*.csv

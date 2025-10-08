@@ -172,9 +172,14 @@ def export_results_to_csv(benchmark_path: str, models: dict, max_windows: int = 
                     if len(forecast) != target_length:
                         raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {len(forecast)} values, but target has {target_length} values")
                     
-                    # Get univariate flag for this model
+                    # Submit forecast based on model type
                     is_univariate = models[model_name]["univariate"]
-                    window.submit_forecast(forecast, univariate=is_univariate)
+                    if is_univariate:
+                        # For univariate models, pass the forecast as univariate_forecast
+                        window.submit_forecast(univariate_forecast=forecast)
+                    else:
+                        # For multivariate models, pass the forecast as multivariate_forecast
+                        window.submit_forecast(multivariate_forecast=forecast)
                     dataset_windows += 1
                     total_windows += 1
                 
