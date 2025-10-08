@@ -91,7 +91,7 @@ class Benchmark:
         
         self.categories = OrderedDict()
         for category_path in category_candidates:
-            category = Category(str(category_path), self.dataset_domain_map, self.dataset_category_map, self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, self.load_cached_counts)
+            category = Category(str(category_path), self.benchmark_path, self.dataset_domain_map, self.dataset_category_map, self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, self.load_cached_counts)
             self.categories[category.category] = category
         
         self.dataset_filepaths = sum([cat.dataset_filepaths for cat in self.categories.values()], [])

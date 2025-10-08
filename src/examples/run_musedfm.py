@@ -35,12 +35,15 @@ from examples.utils import (
 )
 from examples.debug import (
     _initialize_nan_tracking, _update_nan_tracking, _check_window_nan_values,
-    _report_nan_statistics, plot_high_mape_windows, plot_high_mape_univariate_windows,
+    _report_nan_statistics, plot_high_mape_windows,
     debug_model_performance, debug_univariate_performance, debug_forecast_failure,
     debug_forecast_length_mismatch, debug_model_summary
 )
 from examples.export_csvs import (
     export_hierarchical_results_to_csv, export_results_to_csv
+)
+from examples.eval_musedfm import (
+    SaveManager
 )
 
 # Suppress specific statsmodels warnings about ARIMA parameter initialization
@@ -104,7 +107,8 @@ def suppress_all_warnings():
 
 
 def _process_window_with_models(window, models, model_dataset_results, model_dataset_windows, 
-                               results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=1):
+                               results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=1,
+                               save_manager_multivariate=None, save_manager_univariate=None, category="", domain=""):
     """Process a single window with all models."""
     # Check for NaN values in this window
     window_nan_stats = _check_window_nan_values(window)
@@ -112,7 +116,6 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
     # Process this window with all models
     for model_name, model in models.items():
         target_length = len(window.target())
-        print(window.covariates().shape)
         
         # Generate multivariate forecast if model supports it (do this first for proper training)
         multivariate_forecast = None
@@ -124,6 +127,8 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
             if multivariate_forecast is None:
                 debug_forecast_failure(model_name, "multivariate")
                 multivariate_forecast = np.zeros(target_length)  # Fallback to zeros
+            if save_manager_multivariate is not None:
+                save_manager_multivariate.save_forecasts_interval(multivariate_forecast, category, domain, dataset_name)
         
         # Generate univariate forecast
         with suppress_all_warnings():
@@ -133,6 +138,8 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
         if univariate_forecast is None:
             debug_forecast_failure(model_name, "univariate")
             univariate_forecast = np.zeros(target_length)  # Fallback to zeros
+        if save_manager_univariate is not None:
+            save_manager_univariate.save_forecasts_interval(univariate_forecast, category, domain, dataset_name)
 
         # Validate forecast length matches target length
         if len(univariate_forecast) != target_length:
@@ -225,7 +232,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                            categories: str = None, domains: str = None, datasets: str = None,
                            collect_plot_data: bool = False, history_length: int = 512, 
                            forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False,
-                           num_plots_to_keep: int = 1, debug_mode: bool = False):
+                           num_plots_to_keep: int = 1, debug_mode: bool = False, chunk_size: int = 1048576, forecast_save_path: str = "", output_dir: str = ""):
     """Run multiple forecasting models on a benchmark and compare their performance."""
     print("=" * 60)
     print("Running Multiple Models on Benchmark")
@@ -247,13 +254,40 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
         'time': 0.0,
         'windows': 0
     }
+
+    # create category names without ALL_DATASETS
+    new_category_names = copy.deepcopy(benchmark.category_names)
+    print(new_category_names)
+    for category in new_category_names:
+        del new_category_names[category]["ALL_DATASETS"]
+    model_save_managers_multivariate = {}
+    model_save_managers_univariate = {}
     for model_name in models.keys():
         results[model_name] = copy.deepcopy(results_base_dict)
         
         # Initialize univariate results only for non-univariate models
         if not models[model_name]["univariate"]:
             univariate_model_name = f"{model_name}_univariate"
-            results[univariate_model_name] = copy.deepcopy(results_base_dict)        
+            results[univariate_model_name] = copy.deepcopy(results_base_dict)
+            # if forecast_save_path is not empty, save forecasts to the forecast_save_path through save managers
+            if forecast_save_path != "":
+                save_manager_multivariate = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
+                save_manager_univariate = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
+                model_save_managers_univariate[model_name] = save_manager_univariate
+                model_save_managers_multivariate[model_name] = save_manager_multivariate
+            else:
+                save_manager_multivariate = None
+                save_manager_univariate = None
+                model_save_managers_univariate[model_name] = None
+                model_save_managers_multivariate[model_name] = None
+        else:
+            if forecast_save_path != "":
+                save_manager_univariate = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
+            else:
+                save_manager_univariate = None
+                model_save_managers_univariate[model_name] = None
+            save_manager_multivariate = None
+            model_save_managers_multivariate[model_name] = None
     
     # Iterate through benchmark structure: category -> domain -> dataset (outer loop)
     dataset_count = 0
@@ -305,10 +339,19 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                     # Process this window with all models
                     window_nan_stats = _process_window_with_models(
                         window, models, model_dataset_results, model_dataset_windows, 
-                        results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=num_plots_to_keep
+                        results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=num_plots_to_keep,
+                        save_manager_multivariate=model_save_managers_multivariate[model_name], save_manager_univariate=model_save_managers_univariate[model_name],
+                        category=category, domain=domain
                     )
                     if debug_mode: 
                         _update_nan_tracking(nan_stats, window_nan_stats)
+                
+                for model_name, save_manager in model_save_managers_multivariate.items():
+                    if save_manager is not None:
+                        save_manager.reset_saving()
+                for model_name, save_manager in model_save_managers_univariate.items():
+                    if save_manager is not None:
+                        save_manager.reset_saving()
                 
                 # Calculate average metrics and store results for each model
                 for model_name in models.keys():
@@ -327,7 +370,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                     
                     if debug_mode:
                         debug_model_performance(model_name, dataset_avg_metrics, model_dataset_windows, model_elapsed_time)
-                        plot_high_mape_windows(model_name, dataset_name, dataset, models[model_name], dataset_avg_metrics)
+                        plot_high_mape_windows(model_name, dataset_name, dataset, models[model_name], dataset_avg_metrics, save_path=output_dir)
                 
                 # Process univariate results for multivariate models only
                 for model_name, model in models.items():
@@ -337,7 +380,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                     )
                     
                     if univariate_model_name is not None and debug_mode:
-                        plot_high_mape_univariate_windows(univariate_model_name, dataset_name, dataset, model, univariate_avg_metrics)
+                        plot_high_mape_windows(univariate_model_name, dataset_name, dataset, model, univariate_avg_metrics, forecast_type="univariate", save_path=output_dir)
                 
                 # Report NaN statistics for this dataset
                 if debug_mode:
@@ -375,7 +418,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
     return results
 
 
-def generate_forecast_plots(results: dict, output_dir: str = "/tmp"):
+def generate_forecast_plots(results: dict, output_dir: str = "/tmp", limit_windows: int = 10):
     """Generate forecast metrics CSV using pre-computed data from run_models_on_benchmark."""
     print("\n" + "=" * 60)
     print("Generating Forecast Metrics CSV")
@@ -395,6 +438,8 @@ def generate_forecast_plots(results: dict, output_dir: str = "/tmp"):
     print(list(plot_data[0].keys()))
     
     current_dataset_window_forecasts = ("", -1, {})
+    last_window = None
+    window_count = 0
     for i, data in enumerate(plot_data):  # Plot first 6 windows
         window = data['window']
         forecast = data['forecast']
@@ -405,29 +450,34 @@ def generate_forecast_plots(results: dict, output_dir: str = "/tmp"):
         to_plot = False
         if current_dataset_window_forecasts[0] != dataset_name or current_dataset_window_forecasts[1] != window_index:
             to_plot = current_dataset_window_forecasts[0] != ""
+            last_dataset_window_forecasts = copy.deepcopy(current_dataset_window_forecasts)
             current_dataset_window_forecasts = (dataset_name, window_index, {})
             print(f"Started Processing {dataset_name} - Window {window_index}")
+            window_count += 1
         if forecast is not None:
             current_dataset_window_forecasts[2][model_name] = forecast
         if univariate_forecast is not None:
             current_dataset_window_forecasts[2][f"{model_name}_univariate"] = univariate_forecast
         if to_plot:
             # Create title
-            forecasts = current_dataset_window_forecasts[2]
-            title = f"{current_dataset_window_forecasts[0]} - Window {current_dataset_window_forecasts[1]}\nModels: {', '.join(forecasts.keys())}"
+            forecasts = last_dataset_window_forecasts[2]
+            title = f"{last_dataset_window_forecasts[0]} - Window {last_dataset_window_forecasts[1]}\n"
             
             # Plot the window
-            plot_window_forecasts(
-                window=window,
+            plt = plot_window_forecasts(
+                window=last_window,
                 forecasts=forecasts,
                 title=title,
                 figsize=(12, 6),
-                save_path=os.path.join(plots_dir, f"forecast_plot_{i+1}.png")
+                save_path=os.path.join(plots_dir, f"baseline_forecast_{window_index}.png"),
+                show_plot=True
             )
             
             print(f"Saved plot {i+1}: {dataset_name} - Window {window_index} to {os.path.join(plots_dir, f'forecast_plot_{i+1}.png')}")
+        if window_count > limit_windows:
+            break
+        last_window = window
     return True
-
 
 def compare_model_performance(results: dict):
     """Compare and display model performance metrics."""
@@ -578,6 +628,20 @@ Examples:
         action="store_true",
         help="Enable debug mode"
     )
+
+    parser.add_argument(
+        "--forecast-save-path",
+        type=str,
+        default="",
+        help="Path to save the forecasts (default: empty, no saving)"
+    )
+    
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=1048576,
+        help="Chunk size for saving forecasts (default: 1048576)"
+    )
     
     args = parser.parse_args()
     
@@ -611,7 +675,8 @@ Examples:
                                      categories=categories, domains=domains, datasets=datasets,
                                      collect_plot_data=args.plots, history_length=args.history_length,
                                      forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts,
-                                     debug_mode=args.debug_mode)
+                                     debug_mode=args.debug_mode, 
+                                     chunk_size=args.chunk_size, forecast_save_path=args.forecast_save_path, output_dir=args.output_dir)
     
     # Compare performance
     compare_model_performance(results)

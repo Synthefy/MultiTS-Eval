@@ -84,20 +84,37 @@ def _report_nan_statistics(nan_stats: Dict[str, int]) -> None:
 
 
 def plot_high_mape_windows(model_name: str, dataset_name: str, dataset, model: Dict, 
-                          dataset_avg_metrics: Dict[str, float], max_windows: int = 3) -> None:
-    """Plot sample windows for models with high MAPE values."""
+                          dataset_avg_metrics: Dict[str, float], max_windows: int = 3, save_path: str = "",
+                          forecast_type: str = "multivariate") -> None:
+    """Plot sample windows for models with high MAPE values.
+    
+    Args:
+        model_name: Name of the model
+        dataset_name: Name of the dataset
+        dataset: Dataset object to iterate through
+        model: Model dictionary containing model and univariate flag
+        dataset_avg_metrics: Dictionary containing average metrics
+        max_windows: Maximum number of windows to plot
+        save_path: Path to save the plots
+        forecast_type: Type of forecast to generate ("multivariate" or "univariate")
+    """
     if dataset_avg_metrics.get('MAPE', np.nan) > 1000 or np.isnan(dataset_avg_metrics.get('MAPE', np.nan)):
-        print(f"  🔍 High MAPE detected for {model_name} on {dataset_name} - plotting sample windows to /workspace/tmp/{model_name}_{dataset_name}.png")
+        print(f"  🔍 High MAPE detected for {model_name} on {dataset_name} - plotting sample windows to /{save_path}/{model_name}_{dataset_name}.png")
         # Plot first few windows to see what's happening
         for plot_idx, window in enumerate(dataset):
             if plot_idx >= max_windows:  # Only plot first few windows
                 break
+            
             # Get the forecast for this specific window
             target_length = len(window.target())
-            if model["univariate"]:
+            
+            if forecast_type == "univariate":
                 sample_forecast = model["model"].forecast(window.history(), None, target_length)
-            else:
-                sample_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
+            else:  # multivariate
+                if model["univariate"]:
+                    sample_forecast = model["model"].forecast(window.history(), None, target_length)
+                else:
+                    sample_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
             
             if sample_forecast is not None:
                 plot_window_forecasts(
@@ -105,30 +122,7 @@ def plot_high_mape_windows(model_name: str, dataset_name: str, dataset, model: D
                     {model_name: sample_forecast}, 
                     f"{model_name} - {dataset_name} - Window {plot_idx+1}", 
                     figsize=(12, 6), 
-                    save_path=f"/workspace/tmp/{model_name}_{dataset_name}_window_{plot_idx+1}.png"
-                )
-
-
-def plot_high_mape_univariate_windows(univariate_model_name: str, dataset_name: str, dataset, model: Dict,
-                                     univariate_avg_metrics: Dict[str, float], max_windows: int = 3) -> None:
-    """Plot sample windows for univariate models with high MAPE values."""
-    if univariate_avg_metrics.get('MAPE', np.nan) > 1000 or np.isnan(univariate_avg_metrics.get('MAPE', np.nan)):
-        print(f"  🔍 High MAPE detected for {univariate_model_name} on {dataset_name} - plotting sample windows to /workspace/tmp/{univariate_model_name}_{dataset_name}.png")
-        # Plot first few windows to see what's happening
-        for plot_idx, window in enumerate(dataset):
-            if plot_idx >= max_windows:  # Only plot first few windows
-                break
-            # Get the univariate forecast for this specific window
-            target_length = len(window.target())
-            sample_forecast = model["model"].forecast(window.history(), None, target_length)
-            
-            if sample_forecast is not None:
-                plot_window_forecasts(
-                    window, 
-                    {univariate_model_name: sample_forecast}, 
-                    f"{univariate_model_name} - {dataset_name} - Window {plot_idx+1}", 
-                    figsize=(12, 6), 
-                    save_path=f"/workspace/tmp/{univariate_model_name}_{dataset_name}_window_{plot_idx+1}.png"
+                    save_path=f"{save_path}/{model_name}_{dataset_name}_window_{plot_idx+1}.png"
                 )
 
 

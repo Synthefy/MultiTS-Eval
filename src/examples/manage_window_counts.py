@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from musedfm.data.benchmark import Benchmark
 
 
-def cleanup_window_counts(base_path: str = "/workspace/data/fm_eval_nested"):
+def cleanup_window_counts(base_path: str = ""):
     """Clean up old window count JSON files."""
     
     # Remove old format files (without parameters)
@@ -21,17 +21,8 @@ def cleanup_window_counts(base_path: str = "/workspace/data/fm_eval_nested"):
     for file_path in glob.glob(old_pattern):
         os.remove(file_path)
         print(f"Removed old format: {os.path.basename(file_path)}")
-    
-    # Remove from compressed tar directory too
-    compressed_tar_path = "/workspace/data/fm_eval_compressed_tar"
-    if os.path.exists(compressed_tar_path):
-        old_pattern = os.path.join(compressed_tar_path, "*_window_counts.json")
-        for file_path in glob.glob(old_pattern):
-            os.remove(file_path)
-            print(f"Removed old format from compressed tar: {os.path.basename(file_path)}")
 
-
-def save_all_window_counts(base_path: str = "/workspace/data/fm_eval_nested", cleanup_first: bool = False, load_cached: bool = False, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1):
+def save_all_window_counts(base_path: str = "", cleanup_first: bool = False, load_cached: bool = False, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1):
     """Save window counts for all categories."""
     if cleanup_first:
         cleanup_window_counts(base_path)
@@ -77,7 +68,7 @@ def save_all_window_counts(base_path: str = "/workspace/data/fm_eval_nested", cl
     print(f"Total estimated windows: {total_windows:,}")
 
 
-def load_window_counts_summary(base_path: str = "/workspace/data/fm_eval_nested", load_cached: bool = False, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1):
+def load_window_counts_summary(base_path: str = "", load_cached: bool = False, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1):
     """Load and display summary of all window counts."""
     benchmark = Benchmark(base_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached)
     
@@ -98,7 +89,7 @@ def load_window_counts_summary(base_path: str = "/workspace/data/fm_eval_nested"
 def main():
     parser = argparse.ArgumentParser(description="Manage window counts for MUSED-FM datasets")
     parser.add_argument("--action", choices=["save", "load", "both", "cleanup"], default="both")
-    parser.add_argument("--base-path", default="/workspace/data/fm_eval_nested")
+    parser.add_argument("--base-path", default="")
     parser.add_argument("--cleanup-first", action="store_true", help="Clean up old window count files before saving")
     parser.add_argument("--load-cached", action="store_true", help="Load window counts from cached JSON files instead of generating")
     parser.add_argument("--history-length", type=int, default=512, help="History length for windows (default: 512)")

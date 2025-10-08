@@ -17,7 +17,7 @@ class Category:
     Aggregates results across domains.
     """
     
-    def __init__(self, category_path: str, dataset_domain_map: Dict[str, str], dataset_category_map: Dict[str, str], category_names: Dict[str, Dict[str, List[str]]], domain_category_map: Dict[str, str], history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False):
+    def __init__(self, category_path: str, base_path: str, dataset_domain_map: Dict[str, str], dataset_category_map: Dict[str, str], category_names: Dict[str, Dict[str, List[str]]], domain_category_map: Dict[str, str], history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False):
         """
         Initialize category from directory containing multiple domain directories.
         
@@ -49,7 +49,7 @@ class Category:
         
         # Load cached window counts if requested
         if load_cached_counts:
-            self._load_cached_window_counts()
+            self._load_cached_window_counts(base_path)
     
     def _load_domains(self) -> None:
         """Load domains based on data_hierarchy.json, creating virtual domains for datasets."""
@@ -169,10 +169,8 @@ class Category:
         print(f"Results saved to {path}")
         print(f"Aggregated results saved to {aggregated_path}")
     
-    def save_window_counts(self, base_path: str = "/workspace/data/fm_eval_nested") -> None:
-        """Save window counts to JSON file and copy to compressed tar directory."""
-        import shutil
-        
+    def save_window_counts(self, base_path: str = "") -> None:
+        """Save window counts to JSON file and copy to compressed tar directory."""        
         os.makedirs(base_path, exist_ok=True)
         
         # Create filename with parameters
@@ -183,15 +181,9 @@ class Category:
         json_path = os.path.join(base_path, filename)
         with open(json_path, 'w') as f:
             json.dump(window_counts, f, indent=2)
-        
-        # Copy to compressed tar directory
-        compressed_tar_path = "/workspace/data/fm_eval_compressed_tar"
-        if os.path.exists(compressed_tar_path):
-            os.makedirs(compressed_tar_path, exist_ok=True)
-            shutil.copy2(json_path, os.path.join(compressed_tar_path, filename))
         return window_counts
     
-    def load_window_counts(self, base_path: str = "/workspace/data/fm_eval_nested") -> Dict[str, int]:
+    def load_window_counts(self, base_path: str = "") -> Dict[str, int]:
         """Load window counts from JSON file if present."""
         filename = f"{self.category}_window_counts_h{self.history_length}_f{self.forecast_horizon}_s{self.stride}.json"
         json_path = os.path.join(base_path, filename)
@@ -204,7 +196,7 @@ class Category:
             window_counts = self.save_window_counts(base_path)
             return window_counts
 
-    def get_window_counts(self, use_cached: bool = True, base_path: str = "/workspace/data/fm_eval_nested") -> Dict[str, int]:
+    def get_window_counts(self, use_cached: bool = True, base_path: str = "") -> Dict[str, int]:
         """Get window counts, optionally from cached JSON file."""
         if use_cached:
             cached_counts = self.load_window_counts(base_path)
@@ -213,9 +205,9 @@ class Category:
         
         return {dataset.dataset_name: len(dataset) for domain in self._domains for dataset in domain._datasets}
     
-    def _load_cached_window_counts(self) -> None:
+    def _load_cached_window_counts(self, base_path: str = "") -> None:
         """Load cached window counts and override dataset window counts."""
-        cached_counts = self.load_window_counts()
+        cached_counts = self.load_window_counts(base_path)
         if cached_counts:
             # Override window counts for datasets that have cached values
             for domain in self._domains:
