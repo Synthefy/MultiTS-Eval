@@ -320,3 +320,39 @@ linear_regression_univariate Summary:
   Average NMAE: 0.1123
 ```
 
+# Make a submission
+
+Submit data as a folder with the following structure:
+
+```
+<model_name>/
+├── <collection>/
+│   └── <domain>/
+│       └── <dataset>/
+│           ├── {model}_s{stride}_w{history_length}_f{forecast_horizon}_b{batch_idx}.parquet
+│           └── ...
+└── metadata.json
+```
+
+**File naming convention:**
+- Parquet files: `{model}_s{stride}_w{history_length}_f{forecast_horizon}_b{batch_idx}.parquet`
+- Use `batch_idx` to order files if there are multiple files
+
+**Metadata.json contents:**
+```json
+{
+    "model": "YOUR_MODEL_NAME",
+    "model_type": "one of statistical, deep-learning, agentic, pretrained, fine-tuned or zero-shot",
+    "model_dtype": "float32, etc.",
+    "model_link": "To your HF model link, e.g., https://huggingface.co/amazon/chronos-t5-small",
+    "org": "YOUR_ORG_NAME",
+    "testdata_leakage": "one of Yes or No",
+    "history_length": 512,
+    "forecast_horizon": 128,
+    "stride": 256
+}
+```
+
+**Notes:**
+- `model`, `stride`, `history_length`, `forecast_horizon` will be used to identify the parquet files
+- Example files are provided in `src/examples/eval_musedfm` and `src/examples/run_musedfm`

@@ -45,13 +45,15 @@ class Category:
         self.load_cached_counts = load_cached_counts
         self.iterated_dataset_dict = json.load(open(Path(__file__).parent / "iterated_datasets.json"))
         self._domains: List[Domain] = []
-        self._load_domains()
+        count_filename = f"{self.category}_window_counts_h{self.history_length}_f{self.forecast_horizon}_s{self.stride}.json"
+        needs_counting = not self.load_cached_counts or not os.path.exists(os.path.join(base_path, count_filename))
+        self._load_domains(needs_counting)
         
         # Load cached window counts if requested
         if load_cached_counts:
             self._load_cached_window_counts(base_path)
     
-    def _load_domains(self) -> None:
+    def _load_domains(self, needs_counting: bool=True) -> None:
         """Load domains based on data_hierarchy.json, creating virtual domains for datasets."""
         # utilize the dataset_domain_map and dataset_category_map to load the domains
         self.per_domain_paths = OrderedDict()
@@ -71,7 +73,7 @@ class Category:
             
         # load the domains and check if there are any missing domains or datasets
         for domain in self.per_domain_paths:
-            domain = Domain(domain, self.per_domain_paths[domain], self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, needs_counting=not self.load_cached_counts)
+            domain = Domain(domain, self.per_domain_paths[domain], self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, needs_counting=needs_counting)
             self._domains.append(domain)
         
         for domain in self.category_names[self.category]:
@@ -175,10 +177,11 @@ class Category:
         
         # Create filename with parameters
         filename = f"{self.category}_window_counts_h{self.history_length}_f{self.forecast_horizon}_s{self.stride}.json"
-        
+
         window_counts = {dataset.dataset_name: len(dataset) for domain in self._domains for dataset in domain._datasets}
         
         json_path = os.path.join(base_path, filename)
+        print(f"saving window counts to {json_path}, window counts: {window_counts}")
         with open(json_path, 'w') as f:
             json.dump(window_counts, f, indent=2)
         return window_counts
@@ -187,7 +190,8 @@ class Category:
         """Load window counts from JSON file if present."""
         filename = f"{self.category}_window_counts_h{self.history_length}_f{self.forecast_horizon}_s{self.stride}.json"
         json_path = os.path.join(base_path, filename)
-
+        print(f"loading window counts from {json_path}")
+        
         if os.path.exists(json_path):
             with open(json_path, 'r') as f:
                 return json.load(f)
@@ -208,6 +212,8 @@ class Category:
     def _load_cached_window_counts(self, base_path: str = "") -> None:
         """Load cached window counts and override dataset window counts."""
         cached_counts = self.load_window_counts(base_path)
+        print(f"loaded {len(cached_counts)} cached window counts for category {self.category}")
+        print(list(cached_counts.keys()))
         if cached_counts:
             # Override window counts for datasets that have cached values
             for domain in self._domains:

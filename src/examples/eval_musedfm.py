@@ -58,27 +58,38 @@ class SaveManager:
         self.chunk_size = chunk_size
         self.forecast_block = []
         self.forecast_block_idx = 0
+        self.last_block_save_path = None
     
     def save_forecasts_interval(self, forecast, category, domain, dataset):
         self.forecast_block.append(forecast)
+        self.last_block_save_path = f"{self.save_path}/forecasts/{category}/{domain}/{dataset}/{self.model_name}_s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_b{self.forecast_block_idx}.parquet"
         if len(self.forecast_block) * self.forecast_horizon > self.chunk_size:
-            block_save_path = f"{self.save_path}/forecasts/{category}/{domain}/{dataset}/{self.model_name}_s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_b{self.forecast_block_idx}.parquet"
-            # create an index for each forecast window
-            window_idx = list()
-            for i, forecast in enumerate(self.forecast_block):
-                window_idx.extend([i] * len(forecast))
-            window_idx = np.array(window_idx)
-            forecast_block_df = pd.DataFrame(np.concatenate(self.forecast_block, axis=0))
-            forecast_block_df['window_idx'] = window_idx
-            forecast_block_df.to_parquet(block_save_path)
+            self.run_saving()
             self.forecast_block = []
             self.forecast_block_idx += 1
-    
+
     def reset_saving(self):
         self.forecast_block = []
         self.forecast_block_idx = 0
+        self.last_block_save_path = None
     
-    @classmethod
+    def flush_saving(self):
+        self.run_saving(target_save_path=self.last_block_save_path)
+        self.reset_saving()
+    
+    def run_saving(self, target_save_path=None):
+        if target_save_path is None:
+            target_save_path = self.last_block_save_path
+        # create an index for each forecast window
+        window_idx = list()
+        for i, forecast in enumerate(self.forecast_block):
+            window_idx.extend([i] * len(forecast))
+        window_idx = np.array(window_idx)
+        forecast_block_df = pd.DataFrame(np.concatenate(self.forecast_block, axis=0))
+        forecast_block_df['window_idx'] = window_idx
+        os.makedirs(os.path.dirname(target_save_path), exist_ok=True)
+        forecast_block_df.to_parquet(target_save_path)
+    
     def load_forecasts(self, save_path, model_name):
         '''returns an iterator that yields all of the forecasts for a given model'''
         def forecast_generator():
@@ -86,7 +97,7 @@ class SaveManager:
                 for domain in self.category_names[category]:
                     for dataset in self.category_names[category][domain]:
                         # find all files in the folder and  sort by forecast_block_idx
-                        files = sorted(glob.glob(f"{self.save_path}/forecasts/{category}/{domain}/{dataset}/{self.model_name}_*_s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_*.parquet"), key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))
+                        files = sorted(glob.glob(f"{self.save_path}/forecasts/{category}/{domain}/{dataset}/{self.model_name}_s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_b*.parquet"), key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))
                         for file in files:
                             forecast_block_df = pd.read_parquet(file)
 
@@ -106,7 +117,7 @@ class SaveManager:
         return forecast_generator()
 
 def _forecast_window_with_models(window, models, model_dataset_results, model_dataset_windows, 
-                               results, save_manager_multivariate, save_manager_univariate, category, domain, dataset):
+                               results, save_managers_multivariate, save_managers_univariate, category, domain, dataset):
     """Process a single window with all models."""
     # Check for NaN values in this window
     window_nan_stats = _check_window_nan_values(window)
@@ -128,22 +139,15 @@ def _forecast_window_with_models(window, models, model_dataset_results, model_da
             univariate_forecast = model["model"].forecast(window.history(), None, target_length)
         if univariate_forecast is None:
             univariate_forecast = np.zeros(target_length)  # Fallback to zeros
-        
+
         # Get evaluation results for multivariate forecast if submitted
         if multivariate_forecast is not None:
-            multivariate_results = window.evaluate("multivariate")
-            model_dataset_results[model_name].append(multivariate_results)
-            save_manager_multivariate.save_forecasts_interval(multivariate_forecast, category, domain, dataset)
+            save_managers_multivariate[model_name].save_forecasts_interval(multivariate_forecast, category.category, domain.domain_name, dataset.dataset_name)
         
         # Store univariate results
         if univariate_forecast is not None:
-            univariate_results = window.evaluate("univariate")
             # For univariate models, store in main results; for multivariate models, store in _univariate
-            if model["univariate"]:
-                model_dataset_results[model_name].append(univariate_results)
-            else:
-                model_dataset_results[f"{model_name}_univariate"].append(univariate_results)        
-            save_manager_univariate.save_forecasts_interval(univariate_forecast, category, domain, dataset)
+            save_managers_univariate[model_name].save_forecasts_interval(univariate_forecast, category.category, domain.domain_name, dataset.dataset_name)
 
         model_dataset_windows[model_name] += 1
         results[model_name]['windows'] += 1
@@ -182,7 +186,8 @@ def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows:
         'windows': 0
     }
     new_category_names = copy.deepcopy(benchmark.category_names)
-    del new_category_names["ALL_DATASETS"]
+    for category in new_category_names:
+        del new_category_names[category]["ALL_DATASETS"]
     model_save_managers_multivariate = {}
     model_save_managers_univariate = {}
     for model_name in models.keys():
@@ -194,12 +199,11 @@ def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows:
             results[univariate_model_name] = copy.deepcopy(results_base_dict)
             save_manager_multivariate = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
             model_save_managers_multivariate[model_name] = save_manager_multivariate
-            save_manager_univariate = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
+            save_manager_univariate = SaveManager(forecast_save_path, new_category_names, univariate_model_name, stride, history_length, forecast_horizon, chunk_size)
             model_save_managers_univariate[model_name] = save_manager_univariate
         else:
             save_manager_univariate = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
             model_save_managers_univariate[model_name] = save_manager_univariate
-            save_manager_multivariate = None
             model_save_managers_multivariate[model_name] = None
     
     # Iterate through benchmark structure: category -> domain -> dataset (outer loop)
@@ -252,12 +256,14 @@ def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows:
                     # Process this window with all models
                     window_nan_stats = _forecast_window_with_models(
                         window, models, model_dataset_results, model_dataset_windows, 
-                        results, model_save_managers_multivariate[model_name], model_save_managers_univariate[model_name], category, domain, dataset
+                        results, model_save_managers_multivariate, model_save_managers_univariate, category, domain, dataset
                     )
                 for model_name, save_manager in model_save_managers_multivariate.items():
-                    save_manager.reset_saving()
+                    if save_manager is not None:
+                        save_manager.flush_saving()
                 for model_name, save_manager in model_save_managers_univariate.items():
-                    save_manager.reset_saving()
+                    if save_manager is not None:
+                        save_manager.flush_saving()
     return results
 
 def main():

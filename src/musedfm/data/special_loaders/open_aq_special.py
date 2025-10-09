@@ -27,16 +27,16 @@ class OpenAQSpecialLoader:
             data_path: Path to the OpenAQ data directory
         """
         self.data_path = Path(data_path)
-        self.csv_files = self._collect_files()
+        self.pq_files = self._collect_files()
         
     def _collect_files(self) -> List[Path]:
         """Collect and sort all parquet files in the data location."""
-        csv_files = list(self.data_path.rglob("*.parquet"))
-        return sorted(csv_files)
+        pq_files = list(self.data_path.rglob("*.parquet"))
+        return sorted(pq_files)
     
     def _load_and_preprocess_data(self, file_path: Path) -> pd.DataFrame:
         """Load and preprocess a single OpenAQ data file."""
-        # Load the CSV file
+        # Load the parquet file
         df = pd.read_parquet(file_path)
         
         # Convert datetime column
@@ -77,9 +77,8 @@ class OpenAQSpecialLoader:
             List of DataFrames with processed data
         """
         all_dataframes = []
-        print(str(self.data_path), self.csv_files)
         
-        for file_path in self.csv_files:
+        for file_path in self.pq_files:
             df = self._load_and_preprocess_data(file_path)
             if len(df) > 0:
                 all_dataframes.append(df)

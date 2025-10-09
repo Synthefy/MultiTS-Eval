@@ -18,6 +18,7 @@ import os
 import warnings
 import numpy as np
 import argparse
+from tqdm import tqdm
 import copy
 
 # Set environment variable to suppress warnings at the system level
@@ -108,7 +109,7 @@ def suppress_all_warnings():
 
 def _process_window_with_models(window, models, model_dataset_results, model_dataset_windows, 
                                results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=1,
-                               save_manager_multivariate=None, save_manager_univariate=None, category="", domain=""):
+                               save_managers_multivariate=None, save_managers_univariate=None, category="", domain=""):
     """Process a single window with all models."""
     # Check for NaN values in this window
     window_nan_stats = _check_window_nan_values(window)
@@ -127,8 +128,8 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
             if multivariate_forecast is None:
                 debug_forecast_failure(model_name, "multivariate")
                 multivariate_forecast = np.zeros(target_length)  # Fallback to zeros
-            if save_manager_multivariate is not None:
-                save_manager_multivariate.save_forecasts_interval(multivariate_forecast, category, domain, dataset_name)
+            if save_managers_multivariate[model_name] is not None:
+                save_managers_multivariate[model_name].save_forecasts_interval(multivariate_forecast, category.category, domain.domain_name, dataset_name)
         
         # Generate univariate forecast
         with suppress_all_warnings():
@@ -138,8 +139,8 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
         if univariate_forecast is None:
             debug_forecast_failure(model_name, "univariate")
             univariate_forecast = np.zeros(target_length)  # Fallback to zeros
-        if save_manager_univariate is not None:
-            save_manager_univariate.save_forecasts_interval(univariate_forecast, category, domain, dataset_name)
+        if save_managers_univariate[model_name] is not None:
+            save_managers_univariate[model_name].save_forecasts_interval(univariate_forecast, category.category, domain.domain_name, dataset_name)
 
         # Validate forecast length matches target length
         if len(univariate_forecast) != target_length:
@@ -257,7 +258,6 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
 
     # create category names without ALL_DATASETS
     new_category_names = copy.deepcopy(benchmark.category_names)
-    print(new_category_names)
     for category in new_category_names:
         del new_category_names[category]["ALL_DATASETS"]
     model_save_managers_multivariate = {}
@@ -282,17 +282,31 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 model_save_managers_multivariate[model_name] = None
         else:
             if forecast_save_path != "":
-                save_manager_univariate = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
+                model_save_managers_univariate[model_name] = SaveManager(forecast_save_path, new_category_names, model_name, stride, history_length, forecast_horizon, chunk_size)
             else:
-                save_manager_univariate = None
                 model_save_managers_univariate[model_name] = None
-            save_manager_multivariate = None
             model_save_managers_multivariate[model_name] = None
     
     # Iterate through benchmark structure: category -> domain -> dataset (outer loop)
     dataset_count = 0
     skip_datasets_debug = 0  # DEBUG: Change this to skip the first N datasets for debugging
     last_dataset_debug = -1
+    
+    # Count total datasets for progress bar
+    total_datasets = 0
+    for category in benchmark:
+        if categories is not None and category.category_path.name not in categories:
+            continue
+        for domain in category:
+            if domains is not None and domain.domain_path.name not in domains:
+                continue
+            for dataset in domain:
+                if datasets is not None and dataset.data_path.name not in datasets:
+                    continue
+                total_datasets += 1
+    
+    # Main processing loop with progress bar
+    dataset_progress = tqdm(total=total_datasets, desc="Processing datasets", unit="dataset")
     
     for category in benchmark:
         # Apply filters if specified
@@ -308,12 +322,13 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 # Skip first few datasets for debugging
                 if dataset_count < skip_datasets_debug or (last_dataset_debug > 0 and dataset_count >= last_dataset_debug):
                     dataset_count += 1
-                    print(f"Skipping dataset {dataset_count}: {dataset.data_path.name}")
+                    dataset_progress.set_postfix_str(f"Skipping: {dataset.data_path.name}")
+                    dataset_progress.update(1)
                     continue
                 
                 # Get full dataset name from benchmark path
                 dataset_name = str(dataset.data_path.relative_to(benchmark.benchmark_path))
-                print(f"\nProcessing dataset {dataset_count + 1}: {dataset_name}")
+                dataset_progress.set_postfix_str(f"Processing: {dataset_name}")
                 dataset_count += 1
                 
                 # Process all models for this dataset (inner loop)
@@ -331,27 +346,35 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 # Initialize NaN tracking for this dataset
                 nan_stats = _initialize_nan_tracking()
                 
+                # Determine number of windows to process
+                num_windows = min(len(dataset), max_windows) if max_windows is not None else len(dataset)
+                window_progress = tqdm(total=num_windows, desc=f"Windows in {dataset_name}", unit="window", leave=False)
+                
                 for i, window in enumerate(dataset):
                     # Check max_windows per dataset, not overall
                     if max_windows is not None and i >= max_windows:
                         break
                     
+                    window_progress.set_postfix_str(f"Window {i+1}/{len(dataset)}")
+                    
                     # Process this window with all models
                     window_nan_stats = _process_window_with_models(
                         window, models, model_dataset_results, model_dataset_windows, 
                         results, collect_plot_data, plot_data, dataset_name, num_plots_to_keep=num_plots_to_keep,
-                        save_manager_multivariate=model_save_managers_multivariate[model_name], save_manager_univariate=model_save_managers_univariate[model_name],
+                        save_managers_multivariate=model_save_managers_multivariate, save_managers_univariate=model_save_managers_univariate,
                         category=category, domain=domain
                     )
                     if debug_mode: 
                         _update_nan_tracking(nan_stats, window_nan_stats)
+                    
+                    window_progress.update(1)
                 
                 for model_name, save_manager in model_save_managers_multivariate.items():
                     if save_manager is not None:
-                        save_manager.reset_saving()
+                        save_manager.flush_saving()
                 for model_name, save_manager in model_save_managers_univariate.items():
                     if save_manager is not None:
-                        save_manager.reset_saving()
+                        save_manager.flush_saving()
                 
                 # Calculate average metrics and store results for each model
                 for model_name in models.keys():
@@ -386,10 +409,16 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 if debug_mode:
                     _report_nan_statistics(nan_stats)
                 
-                print(f"  Completed dataset {dataset_name}")
+                # Close window progress bar and update dataset progress
+                window_progress.close()
+                dataset_progress.update(1)
+                print(f"  Completed dataset {dataset_name} with {model_dataset_windows[model_name]} windows")
         
         # Aggregate domain-level metrics for this domain
         _aggregate_results_by_level(results, models, benchmark, domain.domain_name, 'domain')
+    
+    # Close dataset progress bar
+    dataset_progress.close()
     
     # Aggregate category-level metrics for each category
     for category in benchmark:
@@ -452,7 +481,7 @@ def generate_forecast_plots(results: dict, output_dir: str = "/tmp", limit_windo
             to_plot = current_dataset_window_forecasts[0] != ""
             last_dataset_window_forecasts = copy.deepcopy(current_dataset_window_forecasts)
             current_dataset_window_forecasts = (dataset_name, window_index, {})
-            print(f"Started Processing {dataset_name} - Window {window_index}")
+            print(f"Started Processing {dataset_name} - Window {window_count}")
             window_count += 1
         if forecast is not None:
             current_dataset_window_forecasts[2][model_name] = forecast
@@ -469,12 +498,12 @@ def generate_forecast_plots(results: dict, output_dir: str = "/tmp", limit_windo
                 forecasts=forecasts,
                 title=title,
                 figsize=(12, 6),
-                save_path=os.path.join(plots_dir, f"baseline_forecast_{window_index}.png"),
+                save_path=os.path.join(plots_dir, f"baseline_forecast_{window_count-1}.png"),
                 show_plot=True
             )
             
-            print(f"Saved plot {i+1}: {dataset_name} - Window {window_index} to {os.path.join(plots_dir, f'forecast_plot_{i+1}.png')}")
-        if window_count > limit_windows:
+            print(f"Saved plot {i+1}: {dataset_name} - Window {window_count-1} to {os.path.join(plots_dir, f'baseline_forecast_{window_count-1}.png')}")
+        if limit_windows > 0 and window_count > limit_windows:
             break
         last_window = window
     return True
@@ -685,7 +714,7 @@ Examples:
     
     # Generate plots if requested
     if args.plots and '_plot_data' in results:
-        generate_forecast_plots(results, output_dir=args.output_dir)
+        generate_forecast_plots(results, output_dir=args.output_dir, limit_windows = -1)
     
     # Export CSV if requested
     if args.csv:
