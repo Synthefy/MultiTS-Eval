@@ -143,3 +143,8 @@ class Domain:
         
         print(f"Results saved to {path}")
         print(f"Aggregated results saved to {aggregated_path}")
+    
+    def reset_iterator(self) -> None:
+        """Reset iterator state for all datasets in this domain."""
+        for dataset in self._datasets:
+            dataset.reset_iterator()

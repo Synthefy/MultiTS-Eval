@@ -221,3 +221,8 @@ class Category:
                     if dataset.dataset_name in cached_counts:
                         dataset._total_windows = cached_counts[dataset.dataset_name]
         print("successfully counted windows from cached JSON files")
+    
+    def reset_iterator(self) -> None:
+        """Reset iterator state for all domains in this category."""
+        for domain in self._domains:
+            domain.reset_iterator()

@@ -32,7 +32,10 @@ from musedfm.plotting import plot_window_forecasts
 
 # Import utility and debug functions
 from examples.utils import (
-    parse_models, _aggregate_metrics, _aggregate_results_by_level
+    _aggregate_metrics, _aggregate_results_by_level
+)
+from examples.model_handling import (
+    parse_models
 )
 from examples.debug import (
     _initialize_nan_tracking, _update_nan_tracking, _check_window_nan_values,
@@ -41,7 +44,7 @@ from examples.debug import (
     debug_forecast_length_mismatch, debug_model_summary
 )
 from examples.export_csvs import (
-    export_hierarchical_results_to_csv, export_results_to_csv
+    export_hierarchical_results_to_csv
 )
 from examples.eval_musedfm import (
     SaveManager
@@ -613,12 +616,6 @@ Examples:
     )
     
     parser.add_argument(
-        "--csv",
-        action="store_true",
-        help="Export results to CSV files"
-    )
-    
-    parser.add_argument(
         "--output-dir",
         type=str,
         default="/tmp",
@@ -683,7 +680,6 @@ Examples:
     print(f"Datasets: {args.datasets or 'All'}")
     print(f"Max windows per dataset: {args.windows}")
     print(f"Generate plots: {args.plots}")
-    print(f"Export CSV: {args.csv}")
     print(f"Output directory: {args.output_dir}")
     
     # Parse models
@@ -715,12 +711,6 @@ Examples:
     # Generate plots if requested
     if args.plots and '_plot_data' in results:
         generate_forecast_plots(results, output_dir=args.output_dir, limit_windows = -1)
-    
-    # Export CSV if requested
-    if args.csv:
-        export_results_to_csv(args.benchmark_path, models, max_windows=args.windows, output_dir=args.output_dir,
-                             categories=categories, domains=domains, datasets=datasets,
-                             history_length=args.history_length, forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts)
     
     total_time = time.time() - start_time
     print(f"\nTotal execution time: {total_time:.2f} seconds")

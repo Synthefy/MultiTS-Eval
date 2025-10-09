@@ -26,7 +26,10 @@ from musedfm.plotting import plot_window_forecasts
 
 # Import utility and debug functions
 from examples.utils import (
-    parse_models, _aggregate_metrics, _aggregate_results_by_level
+    _aggregate_metrics, _aggregate_results_by_level
+)
+from examples.model_handling import (
+    parse_models
 )
 from examples.debug import (
     _initialize_nan_tracking, _update_nan_tracking, _check_window_nan_values,
@@ -35,7 +38,7 @@ from examples.debug import (
     debug_forecast_length_mismatch, debug_model_summary
 )
 from examples.export_csvs import (
-    export_hierarchical_results_to_csv, export_results_to_csv
+    export_hierarchical_results_to_csv
 )
 # Additional aggressive suppression
 import contextlib

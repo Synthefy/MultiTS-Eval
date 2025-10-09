@@ -11,6 +11,7 @@ import os
 import glob
 import pandas as pd
 from pathlib import Path
+from typing import Optional
 from musedfm.data import Benchmark
 
 
@@ -109,96 +110,3 @@ def export_hierarchical_results_to_csv(results: dict, output_dir: str = "/tmp"):
     print(f"  Categories: {category_dir}/")
     print(f"  Domains: {domain_dir}/")
     print(f"  Datasets: {dataset_dir}/")
-
-
-def export_results_to_csv(benchmark_path: str, models: dict, max_windows: int = None, output_dir: str = "/tmp",
-                         categories: str = None, domains: str = None, datasets: str = None,
-                         history_length: int = 512, forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False):
-    """Export forecast results to CSV files."""
-    print("\n" + "=" * 60)
-    print("Exporting Results to CSV")
-    print("=" * 60)
-    
-    # Clean existing CSV files in output directory
-    csv_patterns = [
-        os.path.join(output_dir, "musedfm_results*.csv"),
-        os.path.join(output_dir, "*_results.csv")
-    ]
-    
-    for pattern in csv_patterns:
-        for csv_file in glob.glob(pattern):
-            try:
-                os.remove(csv_file)
-                print(f"✓ Cleaned CSV file: {os.path.basename(csv_file)}")
-            except OSError as e:
-                print(f"Warning: Could not remove {csv_file}: {e}")
-    
-    benchmark = Benchmark(benchmark_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached_counts)
-    
-    # Process windows with the first model (for CSV export, we only need one model's forecasts)
-    first_model = next(iter(models.values()))["model"]
-    model_name = next(iter(models.keys()))
-    
-    print(f"Processing {max_windows if max_windows is not None else 'all'} windows per dataset with {model_name} for CSV export...")
-    
-    total_windows = 0
-    
-    # Iterate through benchmark structure: category -> domain -> dataset
-    for category in benchmark:
-        if categories is not None and category.category_path.name not in categories:
-            continue
-        for domain in category:
-            if domains is not None and domain.domain_path.name not in domains:
-                continue
-            for dataset in domain:
-                # Apply filters if specified
-                if datasets is not None and dataset.data_path.name not in datasets:
-                    continue
-                
-                # Get full dataset name from benchmark path
-                dataset_name = str(dataset.data_path.relative_to(benchmark.benchmark_path))
-                print(f"  Processing dataset: {dataset_name}")
-                dataset_windows = 0
-                
-                for i, window in enumerate(dataset):
-                    # Check max_windows per dataset, not overall
-                    if max_windows is not None and dataset_windows >= max_windows:
-                        break
-                    
-                    target_length = len(window.target())
-                    forecast = first_model.forecast(window.history(), window.covariates(), target_length)
-                    
-                    # Validate forecast length matches target length
-                    if len(forecast) != target_length:
-                        raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {len(forecast)} values, but target has {target_length} values")
-                    
-                    # Submit forecast based on model type
-                    is_univariate = models[model_name]["univariate"]
-                    if is_univariate:
-                        # For univariate models, pass the forecast as univariate_forecast
-                        window.submit_forecast(univariate_forecast=forecast)
-                    else:
-                        # For multivariate models, pass the forecast as multivariate_forecast
-                        window.submit_forecast(multivariate_forecast=forecast)
-                    dataset_windows += 1
-                    total_windows += 1
-                
-                print(f"    Processed {dataset_windows} windows from {dataset_name}")
-    
-    # Export CSV using benchmark's method
-    output_path = f"{output_dir}/musedfm_results.csv"
-    benchmark.to_results_csv(output_path)
-    
-    # Check if files were created
-    if Path(output_path).exists():
-        print(f"✓ Results CSV created: {output_path}")
-    else:
-        print("✗ Results CSV not created")
-    
-    aggregated_path = f"{output_dir}/musedfm_results_aggregated.csv"
-    if Path(aggregated_path).exists():
-        print(f"✓ Aggregated CSV created: {aggregated_path}")
-    else:
-        print("✗ Aggregated CSV not created")
-    
-    return True

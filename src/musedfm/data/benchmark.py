@@ -267,3 +267,8 @@ class Benchmark:
         for metric, value in aggregated_results.items():
             if not metric.endswith('_std'):
                 print(f"  {metric}: {value:.4f}")
+    
+    def reset_iterator(self) -> None:
+        """Reset iterator state for all categories in this benchmark."""
+        for category in self.categories.values():
+            category.reset_iterator()

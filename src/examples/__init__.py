@@ -10,16 +10,18 @@ from examples.run_musedfm import (
     generate_forecast_plots
 )
 
-from examples.utils import (
+from examples.model_handling import (
     get_available_models,
     parse_models,
+)
+
+from examples.utils import (
     _aggregate_metrics,
     _aggregate_results_by_level
 )
 
 from examples.export_csvs import (
     export_hierarchical_results_to_csv,
-    export_results_to_csv
 )
 
 __all__ = [

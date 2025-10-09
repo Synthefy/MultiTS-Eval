@@ -19,29 +19,41 @@ The breakdown of domains, categories and datasets can be found in `src/musedfm/d
 
 ## Directory Layout
 ```
-src/musedfm/
-    data/
-        window.py              # Individual forecasting windows
-        dataset.py             # Dataset loading and windowing
-        domain.py              # Domain management
-        category.py            # Category management
-        benchmark.py           # Top-level benchmark container
-        dataset_config.json    # Dataset configuration
-        data_hierarchy.json    # Data organization hierarchy
-        special_loaders/       # Custom data loaders
-            __init__.py
-            open_aq_special.py # OpenAQ air quality data loader
-    baselines/                 # Baseline forecasting models
-        mean_forecast.py
-        historical_inertia.py
-        linear_trend.py
-        exponential_smoothing.py
-        arima_forecast.py
-    metrics.py                 # Evaluation metrics
-    plotting/                  # Visualization utilities
-        plot_forecasts.py
-examples/
-    run_musedfm.py            # Main evaluation script
+MUSED-FM/
+├── src/musedfm/              # Core MUSED-FM package
+│   ├── data/                 # Data handling components
+│   │   ├── window.py         # Individual forecasting windows
+│   │   ├── dataset.py        # Dataset loading and windowing
+│   │   ├── domain.py         # Domain management
+│   │   ├── category.py       # Category management
+│   │   ├── benchmark.py      # Top-level benchmark container
+│   │   ├── dataset_config.json    # Dataset configuration
+│   │   ├── data_hierarchy.json    # Data organization hierarchy
+│   │   └── special_loaders/  # Custom data loaders
+│   │       ├── __init__.py
+│   │       └── open_aq_special.py # OpenAQ air quality data loader
+│   ├── baselines/            # Baseline forecasting models
+│   │   ├── mean_forecast.py
+│   │   ├── historical_inertia.py
+│   │   ├── linear_trend.py
+│   │   ├── exponential_smoothing.py
+│   │   └── arima_forecast.py
+│   ├── metrics.py            # Evaluation metrics
+│   └── plotting/             # Visualization utilities
+│       └── plot_forecasts.py
+├── src/examples/             # Example scripts and utilities
+│   ├── run_musedfm.py        # Main evaluation script
+│   ├── eval_musedfm.py       # Evaluation script with forecast saving
+│   ├── utils.py              # Utility functions
+│   ├── debug.py              # Debug utilities
+│   └── export_csvs.py        # CSV export utilities
+├── notebooks/                # Jupyter notebooks
+│   ├── baseline_models_musedfm_run_eval.ipynb      # Baseline model evaluation
+│   ├── chronos_bolt_musedfm_run_eval.ipynb         # Chronos Bolt model evaluation
+│   └── chronos_bolt_musedfm_custom_eval.ipynb      # Custom Chronos evaluation
+├── README.md                 # This file
+├── pyproject.toml            # Project configuration
+└── setup.py                  # Package setup
 ```
 
 ---
@@ -143,61 +155,242 @@ All metrics include robust NaN handling and return appropriate warnings when ins
 
 ## Usage
 
-### Running the Benchmark
+## Getting and Setting Up the Data:
 
-Use the main evaluation script to run all baseline models:
-
+**Clone the dataset repo:**
 ```bash
-# Run all models on all datasets
-uv run examples/run_musedfm.py --models all --plots --output-dir /path/to/results --benchmark-path /path/to/data
-
-# Run specific models
-uv run examples/run_musedfm.py --models mean,arima,linear_regression --output-dir /path/to/results --benchmark-path /path/to/data
-
-# Limit windows per dataset for faster testing
-uv run examples/run_musedfm.py --models all --windows 100 --output-dir /path/to/results --benchmark-path /path/to/data
-
-# Run only the linear regression model (generates both univariate and multivariate forecasts)
-uv run examples/run_musedfm.py --models linear_regression --output-dir /path/to/results --benchmark-path /path/to/data
+git clone git@hf.co:datasets/Synthefy/MUSED-FM ./mused-fm-data
 ```
 
-### Utilizing examples/run_musedfm.py as a template
+**Follow the instructions in the repo for unzipping the files**
 
-To add a custom forecasting model:
+**Create the directory structure and extract to target directory**
+```bash
+# Create directory structure in shared memory for faster I/O
+mkdir -p /dev/shm/data/mused-fm-nested/{collections,traditional,sequential,synthetic}
 
-1. **Create your model class**:
+# Extract archives to shared memory
+tar -xzf ./mused-fm-data/collections.tar.gz -C /dev/shm/data/mused-fm-nested &
+tar -xzf ./mused-fm-data/traditional.tar.gz -C /dev/shm/data/mused-fm-nested/traditional &
+tar -xzf ./mused-fm-data/sequential.tar.gz -C /dev/shm/data/mused-fm-nested/sequential &
+tar -xzf ./mused-fm-data/synthetic.tar.gz -C /dev/shm/data/mused-fm-nested/synthetic &
+```
+
+
+### Running the Benchmark
+
+MUSED-FM provides two main evaluation scripts for different use cases:
+
+#### 1. `run_musedfm.py` - Main Evaluation Script
+
+The primary script for running baseline models with visualization and CSV export capabilities:
+
+**Add your model to model_handling**
 ```python
-class MyCustomModel:
+def get_available_models():
+  ...
+    return {
+      ...
+      "your model here": {"model": YourModelClass(), "univariate": False}
+    }
+```
+
+```bash
+# Run all models on all datasets with plots and CSV export and save exports
+uv run src/examples/run_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --plots --load-cached-counts --output-dir /tmp/results --forecast-save-path /tmp/forecasts
+
+# Debug mode
+uv run src/examples/run_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --debug-mode --load-cached-counts --plots --output-dir /tmp/results --forecast-save-path /tmp/forecasts
+```
+
+**Key Features:**
+- Generates forecast plots (`--plots`)
+- Supports debug mode (`--debug-mode`)
+- Uses cached window counts for faster startup (`--load-cached-counts`)
+- Flexible filtering by categories, domains, and datasets
+
+#### 2. `eval_musedfm.py` - Evaluation Script with Forecast Saving
+
+Specialized script for just forecast evaluation:
+
+```bash
+# Run all models with forecast saving
+uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --forecast-save-path /tmp/forecasts
+
+# Run specific models with limited windows
+uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models mean,arima,linear_trend --windows 50 --forecast-save-path /tmp/forecasts
+
+# Run on specific categories with custom parameters
+uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --categories traditional --history-length 512 --forecast-horizon 128 --stride 256 --forecast-save-path /tmp/forecasts
+
+# Use cached window counts for faster execution
+uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --load-cached-counts --forecast-save-path /tmp/forecasts
+```
+
+**Key Features:**
+- Saves forecasts to disk for later analysis (`--forecast-save-path`)
+- Supports chunked saving for large datasets (`--chunk-size`)
+- Optimized for batch processing and evaluation
+- Compatible with forecast loading utilities
+
+#### Command Line Arguments
+
+Both scripts support the following common arguments:
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--benchmark-path` | Path to benchmark directory | `/home/caleb/musedfm_data` |
+| `--models` | Comma-separated list of models or 'all' | `mean,linear_trend` |
+| `--categories` | Filter by categories (e.g., 'traditional,synthetic') | All |
+| `--domains` | Filter by domains (e.g., 'Energy,Finance') | All |
+| `--datasets` | Filter by datasets (e.g., 'al_daily,bitcoin_price') | All |
+| `--windows` | Maximum windows per dataset | None (all) |
+| `--history-length` | History length for windows | 512 |
+| `--forecast-horizon` | Forecast horizon | 128 |
+| `--stride` | Stride between windows | 256 |
+| `--load-cached-counts` | Use cached window counts | False |
+
+**run_musedfm.py specific arguments:**
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--plots` | Generate forecast plots | False |
+| `--output-dir` | Output directory for plots/CSV | `/tmp` |
+| `--debug-mode` | Enable debug mode | False |
+
+**eval_musedfm.py specific arguments:**
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--forecast-save-path` | Path to save forecasts | `/tmp` |
+| `--chunk-size` | Chunk size for saving | 1048576 |
+
+---
+
+## Example Notebooks
+
+MUSED-FM includes several Jupyter notebooks demonstrating different evaluation approaches:
+
+### 1. Baseline Models Evaluation
+**File:** [`notebooks/baseline_models_musedfm_run_eval.ipynb`](notebooks/baseline_models_musedfm_run_eval.ipynb)
+
+Comprehensive evaluation of all baseline models using the `run_musedfm.py` functions:
+- Demonstrates model comparison across different categories
+- Shows plotting and CSV export capabilities
+- Includes performance analysis and debugging utilities
+
+### 2. Chronos Bolt Model Evaluation
+**File:** [`notebooks/chronos_bolt_musedfm_run_eval.ipynb`](notebooks/chronos_bolt_musedfm_run_eval.ipynb)
+
+Evaluation of the Chronos Bolt forecasting model on MUSED-FM:
+- Self-contained ChronosForecast class implementation
+- Integration with MUSED-FM evaluation framework
+- Comparison with baseline models
+
+### 3. Custom Chronos Evaluation
+**File:** [`notebooks/chronos_bolt_musedfm_custom_eval.ipynb`](notebooks/chronos_bolt_musedfm_custom_eval.ipynb)
+
+Custom evaluation approach for Chronos models:
+- Advanced model configuration and tuning
+- Custom evaluation metrics and analysis
+- Specialized forecast handling
+
+**Running Notebooks:**
+```bash
+# Start Jupyter Lab
+uv run jupyter lab
+
+# Or start Jupyter Notebook
+uv run jupyter notebook
+
+# Navigate to the notebooks/ directory and open the desired notebook
+```
+
+---
+
+## Adding Custom Models
+
+### Using Evaluation Functions Directly
+
+Instead of modifying the `run_musedfm.py` file, you can use the evaluation functions directly with your custom models:
+
+```python
+from examples.run_musedfm import run_models_on_benchmark, compare_model_performance
+from examples.utils import parse_models
+from musedfm.baselines.base_forecaster import BaseForecaster
+import numpy as np
+from typing import Optional
+
+# 1. Create your custom model class
+class MyCustomModel(BaseForecaster):
     def __init__(self, param1=1.0, param2=2.0):
         self.param1 = param1
         self.param2 = param2
     
-    def forecast(self, history, covariates, forecast_length):
-        # Your custom forecasting logic here
-        # history: numpy array of historical values
-        # covariates: numpy array of covariate values (can be None)
-        # forecast_length: number of steps to forecast
-        return np.array([np.mean(history) * self.param1] * forecast_length)
-```
+    def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, 
+                forecast_horizon: Optional[int] = None) -> np.ndarray:
+        """
+        Your custom forecasting logic here.
+        
+        Args:
+            history: Historical time series data (shape: [time_steps, features])
+            covariates: Optional covariate data (shape: [time_steps, covariate_features])
+            forecast_horizon: Number of future points to forecast
+            
+        Returns:
+            Forecast values (shape: [forecast_horizon, features])
+        """        
+        # Handle univariate and multivariate
+        if covariates is None:
+            # Univariate case
+            pass
+        else:
+            # Multivariate case
+            pass
+        
+        return forecast
 
-2. **Add to the model dictionary** in `examples/run_musedfm.py`:
-```python
-def get_available_models():
+# 2. Create model dictionary for evaluation
+def get_custom_models():
     return {
-        "mean": {"model": MeanForecast(), "univariate": True},
-        "historical_inertia": {"model": HistoricalInertia(), "univariate": True},
-        "linear_trend": {"model": LinearTrend(), "univariate": True},
-        "exponential_smoothing": {"model": ExponentialSmoothing(), "univariate": True},
-        "arima": {"model": ARIMAForecast(order=(1, 1, 1)), "univariate": True},
-        # Add your custom model:
-        "my_custom": {"model": MyCustomModel(param1=1.5, param2=3.0), "univariate": False}
+        "MY_MODEL": {"model": MyCustomModel(param1=0.1, param2=1.2), "univariate": False} # set univariate to true if your model is only univariate
     }
+
+# 3. Run evaluation using the framework functions
+if __name__ == "__main__":
+    # Parse models (you can mix custom and built-in models)
+    models = get_custom_models()  # or "parse_models() if modifying model_handling.py"
+    
+    # Run evaluation
+    results = run_models_on_benchmark(
+        benchmark_path="/dev/shm/data/mused-fm-nested", # modify to your data path
+        models=models,
+        max_windows=None,  # Limit for testing
+        categories=None,  # Filter to specific categories
+        domains=None,  # All domains
+        datasets=None,  # All datasets
+        history_length=512, # stick to default history and forecast lengths
+        forecast_horizon=128,
+        stride=256,
+        load_cached_counts=True,
+        collect_plot_data=True
+    )
+    
+    # Compare model performance
+    compare_model_performance(results)
+    
+    # Export results
+    from examples.export_csvs import export_hierarchical_results_to_csv
+    export_hierarchical_results_to_csv(results, "/tmp/custom_model_results.csv")
+    
+    print("Custom model evaluation completed!")
 ```
 
-3. **Run your model**:
-```bash
-uv run examples/run_musedfm.py --models my_custom --output-dir /path/to/results --benchmark-path /path/to/data
-```
+### Key Benefits of This Approach:
+
+- **No file modification**: Use existing evaluation framework without changing source code
+- **Flexible**: Mix custom models with built-in models
+- **Reusable**: Easy to create multiple custom models
+- **Well-tested**: Leverages the robust evaluation infrastructure
+- **Complete**: Includes performance comparison and result export
 
 ### Model Classification
 
@@ -208,36 +401,93 @@ uv run examples/run_musedfm.py --models my_custom --output-dir /path/to/results 
 
 ```python
 from musedfm.data import Benchmark
-from musedfm.baselines.linear_regression import LinearRegressionForecast
+from musedfm.baselines.base_forecaster import BaseForecaster
+import numpy as np
+from typing import Optional
 
-benchmark = Benchmark("/path/to/extracted/data")
+# Template for creating custom forecasting models
+class MyCustomForecaster(BaseForecaster):
+    """
+    Template for creating custom forecasting models.
+    Inherit from BaseForecaster and implement the forecast method.
+    """
+    
+    def __init__(self, param1=1.0, param2=2.0):
+        """
+        Initialize your custom model with any parameters.
+        
+        Args:
+            param1: First parameter for your model
+            param2: Second parameter for your model
+        """
+        self.param1 = param1
+        self.param2 = param2
+    
+    def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, 
+                forecast_horizon: Optional[int] = None) -> np.ndarray:
+        """
+        Generate forecast from historical data.
+        
+        Args:
+            history: Historical time series data (shape: [time_steps, features])
+            covariates: Optional covariate data (shape: [time_steps, covariate_features])
+            forecast_horizon: Number of future points to forecast
+            
+        Returns:
+            Forecast values (shape: [forecast_horizon, features])
+        """
+        if forecast_horizon is None:
+            forecast_horizon = 1
+        
+        # Example: Simple moving average with custom parameters
+        # Replace this with your actual forecasting logic
+        if len(history.shape) == 1:
+            # Univariate case
+            forecast = np.full(forecast_horizon, np.mean(history) * self.param1)
+        else:
+            # Multivariate case
+            forecast = np.full((forecast_horizon, history.shape[1]), 
+                             np.mean(history, axis=0) * self.param1)
+        
+        return forecast
 
-# Create a model that can do both univariate and multivariate forecasting
-model = LinearRegressionForecast()
+# Load benchmark data
+benchmark = Benchmark("/dev/shm/data/mused-fm-nested")
 
+# Create your custom model
+custom_model = MyCustomForecaster(param1=1.5, param2=2.0)
+
+# Evaluate model programmatically
 for category in benchmark:
+    print(f"Processing category: {category.name}")
+    
     for domain in category:
+        print(f"  Processing domain: {domain.name}")
+        
         for dataset in domain:
+            print(f"    Processing dataset: {dataset.name}")
+            
+            # Process each window in the dataset
             for window in dataset:
-                # Generate multivariate forecast (uses covariates)
-                multivariate_forecast = model.forecast(window.history(), window.covariates(), len(window.target()))
+                # Generate forecast using your custom model
+                forecast = custom_model.forecast(
+                    window.history(), 
+                    window.covariates(), 
+                    len(window.target())
+                )
                 
-                # Generate univariate forecast (ignores covariates)
-                univariate_model = LinearRegressionForecast(use_covariates=False)
-                univariate_forecast = univariate_model.forecast(window.history(), None, len(window.target()))
-                
-                # Submit both forecasts
-                window.submit_forecast(multivariate_forecast, univariate_forecast)
-                
-                # Get evaluation results for both
-                multivariate_results = window.evaluate("multivariate")
-                univariate_results = window.evaluate("univariate")
-                
-                print(f"Multivariate MAPE: {multivariate_results['MAPE']:.2f}%")
-                print(f"Univariate MAPE: {univariate_results['MAPE']:.2f}%")
+                # Submit forecast for evaluation
+                # Set univariate=True if your model only uses target series
+                # Set univariate=False if your model uses covariates
+                window.submit_forecast(forecast, univariate=True)
+            
+            # Get evaluation results for this dataset
+            dataset_results = dataset.evaluate()
+            print(f"    Dataset results: {dataset_results}")
 
-# Export results
-benchmark.to_results_csv("results.csv")
+# Export consolidated results
+benchmark.to_results_csv("custom_model_results.csv")
+print("Results exported to custom_model_results.csv")
 ```
 
 ---
@@ -250,13 +500,17 @@ benchmark.to_results_csv("results.csv")
 
 ### Install Dependencies
 ```bash
-# Install project dependencies
-uv sync
-
+# install UV
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# create virtual env
+uv venv
 # Activate virtual environment
 source .venv/bin/activate  # On Linux/Mac
 # or
 .venv\Scripts\activate     # On Windows
+# Install project dependencies
+uv sync
+
 ```
 
 ### Install MUSED-FM
@@ -284,40 +538,98 @@ uv pip install -e .
 
 ## Output
 
-The framework generates:
-- **Console output**: Real-time progress and model performance summaries
-- **CSV files**: Detailed metrics for each dataset and model
-- **Plots** (optional): Forecast visualizations for analysis
-- **Aggregated results**: Overall performance across all datasets
+The framework generates comprehensive evaluation results including:
 
-Example output:
+### Console Output
+- **Real-time progress**: Shows processing status for categories, domains, datasets, and windows
+- **Model performance summaries**: Detailed metrics for each model after completion
+- **Debug information**: Optional debug mode provides detailed analysis of model performance
+- **Execution timing**: Total time and per-model timing statistics
+
+### Generated Files
+
+#### Plot Files (when using `--plots` flag)
+- **Forecast visualizations**: Actual vs predicted plots for selected windows
+- **Performance analysis**: Error distribution and trend analysis
+- **Model comparison plots**: Visual comparison of different model outputs
+
+#### Forecast Files (when using `eval_musedfm.py` or passing `--forecast-save-path` to run_musedfm.py)
+- **Saved forecasts**: Raw forecast data in parquet format for later analysis
+- **Metadata**: Model parameters and evaluation settings
+- **Chunked storage**: Efficient storage for large-scale evaluations
+
+### Example Console Output
+
 ```
+MUSED-FM Example: Multiple Model Forecasting
+============================================================
+Models: mean,linear_trend,arima
+Benchmark path: /dev/shm/data/mused-fm-nested
+Categories: All
+Domains: All
+Datasets: All
+Max windows per dataset: 100
+Generate plots: True
+Export CSV: True
+Output directory: /tmp/results
+
+Processing category: traditional
+  Processing domain: Energy
+    Processing dataset: electricity_demand
+      Windows processed: 100/100
+    Processing dataset: solar_power
+      Windows processed: 100/100
+  Processing domain: Finance
+    Processing dataset: stock_prices
+      Windows processed: 100/100
+
 mean Summary:
-  Total windows: 1000
-  Total time: 5.13s
+  Total windows: 300
+  Total time: 2.45s
   Model type: Univariate
-  Average MAPE: 12.45%
-  Average MAE: 0.0234
-  Average RMSE: 0.0345
+  Average MAPE: 15.23%
+  Average MAE: 0.0456
+  Average RMSE: 0.0678
   Average NMAE: 0.1234
 
-linear_regression Summary:
-  Total windows: 1000
-  Total time: 8.45s
-  Model type: Multivariate
-  Average MAPE: 10.23%
-  Average MAE: 0.0198
-  Average RMSE: 0.0289
+linear_trend Summary:
+  Total windows: 300
+  Total time: 3.12s
+  Model type: Univariate
+  Average MAPE: 12.87%
+  Average MAE: 0.0389
+  Average RMSE: 0.0543
   Average NMAE: 0.0987
 
-linear_regression_univariate Summary:
-  Total windows: 1000
-  Total time: 6.12s
+arima Summary:
+  Total windows: 300
+  Total time: 8.45s
   Model type: Univariate
-  Average MAPE: 11.87%
-  Average MAE: 0.0212
-  Average RMSE: 0.0312
-  Average NMAE: 0.1123
+  Average MAPE: 11.23%
+  Average MAE: 0.0321
+  Average RMSE: 0.0489
+  Average NMAE: 0.0876
+
+Best Performance: arima (MAPE: 11.23%)
+
+Total execution time: 14.02 seconds
+Results exported to /tmp/results/
+Plots saved to /tmp/results/plots/
+```
+
+### Output Directory Structure
+
+```
+/tmp/results/
+├── results.csv                    # Consolidated results
+├── hierarchical_results.csv        # Category/domain/dataset breakdown
+├── plots/                         # Forecast visualizations
+│   ├── mean_forecasts.png
+│   ├── linear_trend_forecasts.png
+│   └── arima_forecasts.png
+└── debug/                         # Debug information (if --debug-mode)
+    ├── high_mape_windows.png
+    └── model_performance_analysis.png
 ```
 
 # Make a submission

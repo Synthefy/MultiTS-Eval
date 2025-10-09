@@ -816,6 +816,12 @@ class Dataset:
         """Return number of parquet files in the dataset."""
         return len(self._parquet_files)
     
+    def reset_iterator(self) -> None:
+        """Reset the iterator state to allow fresh iteration."""
+        self._current_parquet_index = 0
+        self._current_window_index = 0
+        self._windows = []
+    
     def evaluate(self) -> Dict[str, float]:
         """
         Run evaluation for all windows (delegates to their cached results).
