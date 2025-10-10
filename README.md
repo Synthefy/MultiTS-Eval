@@ -167,13 +167,13 @@ git clone git@hf.co:datasets/Synthefy/MUSED-FM ./mused-fm-data
 **Create the directory structure and extract to target directory**
 ```bash
 # Create directory structure in shared memory for faster I/O
-mkdir -p /dev/shm/data/mused-fm-nested/{collections,traditional,sequential,synthetic}
+mkdir -p ~/mused-fm-nested/{collections,traditional,sequential,synthetic}
 
 # Extract archives to shared memory
-tar -xzf ./mused-fm-data/collections.tar.gz -C /dev/shm/data/mused-fm-nested &
-tar -xzf ./mused-fm-data/traditional.tar.gz -C /dev/shm/data/mused-fm-nested/traditional &
-tar -xzf ./mused-fm-data/sequential.tar.gz -C /dev/shm/data/mused-fm-nested/sequential &
-tar -xzf ./mused-fm-data/synthetic.tar.gz -C /dev/shm/data/mused-fm-nested/synthetic &
+tar -xzf ./mused-fm-data/collections.tar.gz -C ~/mused-fm-nested &
+tar -xzf ./mused-fm-data/traditional.tar.gz -C ~/mused-fm-nested/traditional &
+tar -xzf ./mused-fm-data/sequential.tar.gz -C ~/mused-fm-nested/sequential &
+tar -xzf ./mused-fm-data/synthetic.tar.gz -C ~/mused-fm-nested/synthetic &
 ```
 
 
@@ -197,7 +197,7 @@ def get_available_models():
 
 ```bash
 # Run all models on all datasets with plots and CSV export and save exports
-uv run src/examples/run_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --plots --load-cached-counts --output-dir /tmp/results --forecast-save-path /tmp/forecasts
+uv run src/examples/run_musedfm.py --benchmark-path ~/~mused-fm-nested --models all --plots --load-cached-counts --output-dir ~/mused-fm-outputs/results --forecast-save-path ~/mused-fm-outputs/forecasts
 
 # Debug mode
 uv run src/examples/run_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --debug-mode --load-cached-counts --plots --output-dir /tmp/results --forecast-save-path /tmp/forecasts

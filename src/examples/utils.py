@@ -6,10 +6,13 @@ This module contains helper functions for:
 - Metrics aggregation
 - NaN value tracking and reporting
 - Results aggregation by different levels
+- Timeout handling for model forecasting
 """
 
 import numpy as np
+import signal
 from typing import Dict, List, Tuple, Any
+from contextlib import contextmanager
 
 
 def _aggregate_metrics(dataset_results: List[Dict], metric_names: List[str] = ['MAPE', 'MAE', 'RMSE', 'NMAE']) -> Tuple[Dict[str, float], int, int]:
@@ -62,3 +65,26 @@ def _aggregate_results_by_level(results: Dict, models: Dict, benchmark, level_na
                 }
 
 
+@contextmanager
+def timeout_handler(seconds):
+    """Context manager for timeout handling in model forecasting.
+    
+    Args:
+        seconds: Timeout duration in seconds
+        
+    Raises:
+        TimeoutError: If the operation exceeds the timeout duration
+    """
+    def timeout_signal_handler(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+    
+    # Set the signal handler
+    old_handler = signal.signal(signal.SIGALRM, timeout_signal_handler)
+    signal.alarm(seconds)
+    
+    try:
+        yield
+    finally:
+        # Restore the old signal handler
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)

@@ -220,7 +220,7 @@ class Dataset:
             return [target_spec]
     
     def __init__(self, data_path: str, history_length: int = 30, forecast_horizon: int = 1, 
-                 stride: int = 1, column_config: Optional[Dict[str, Any]] = None, needs_counting: bool = False):
+                 stride: int = 1, column_config: Optional[Dict[str, Any]] = None, needs_counting: bool = False, dataset_target_count: Optional[Dict[str, int]] = None):
         """
         Initialize dataset from parquet files.
         
@@ -244,7 +244,9 @@ class Dataset:
         self.stride = stride
         self.column_config = column_config
         self._windows: List[Window] = []
+        self.target_count = len(column_config['target_cols']) if column_config is not None and 'target_cols' in column_config else 1
         
+
         # Lazy loading state
         self._current_parquet_index = 0
         self._current_window_index = 0
@@ -415,10 +417,10 @@ class Dataset:
             
             if available_data >= self.history_length + self.forecast_horizon:
                 # Full history and forecast available
-                windows_count += 1
+                windows_count += self.target_count
             elif available_data >= MIN_HISTORY_FORECAST_LENGTH * 2:
                 # Split available data equally between history and forecast
-                windows_count += 1
+                windows_count += self.target_count
         
         return windows_count
     
@@ -512,19 +514,22 @@ class Dataset:
         updated_metadata_cols = [col for col in metadata_cols if col in df_cleaned.columns]
         
         # Remove trailing and preceding NaNs from each column
-        for col in target_cols:
+        
+        for i, col in enumerate(updated_target_cols):
             if col != timestamp_col:  # Don't modify timestamp column
                 # Find first and last non-NaN values
                 first_valid = df_cleaned[col].first_valid_index()
                 last_valid = df_cleaned[col].last_valid_index()
                 
+                
                 if first_valid is not None and last_valid is not None:
                     # Keep only the range from first to last valid value
+                    old_shape = df_cleaned.shape
                     df_cleaned = df_cleaned.loc[first_valid:last_valid]
+                    new_shape = df_cleaned.shape
                 else:
                     # If column is entirely NaN, it should have been dropped above
-                    pass
-        
+                    pass        
         return df_cleaned, updated_target_cols, updated_metadata_cols
 
     def _prep_windows_from_file(self, parquet_file) -> None:
@@ -791,6 +796,7 @@ class Dataset:
         self._current_parquet_index = 0
         self._current_window_index = 0
         self._windows = []
+        total_windows_yielded = 0
         
         while self._current_parquet_index < len(self._parquet_files):
             # Load windows from current parquet file if not already loaded
@@ -801,8 +807,16 @@ class Dataset:
             
             # Yield windows from current parquet file
             while self._current_window_index < len(self._windows):
+                total_windows_yielded += 1
+                # if total_windows_yielded < 10000:
+                #     continue
                 yield self._windows[self._current_window_index]
                 self._current_window_index += 1
+                # Kill process at window 4019 to debug the hang
+                # if total_windows_yielded == 10780:
+                #     print(f"🚨 KILLING PROCESS AT WINDOW {total_windows_yielded} FOR DEBUGGING")
+                #     import os
+                #     os._exit(1)
             
             # Move to next parquet file
             self._current_parquet_index += 1
@@ -811,6 +825,31 @@ class Dataset:
     def __len__(self) -> int:
         """Return total number of windows across all parquet files."""
         return self._total_windows
+    
+    def num_files(self) -> int:
+        """Return number of parquet files in the dataset."""
+        return len(self._parquet_files)
+    
+    def __getitem__(self, index):
+        '''
+        Slice the dataset by parquet files
+        '''        
+        if isinstance(index, slice):
+            # Handle nested slicing
+            actual_index = index.start if index.start else 0
+            actual_end = index.stop if index.stop else self.num_files()
+            new_dataset = Dataset(self.data_path, self.history_length, self.forecast_horizon, self.stride, self.column_config, True, {})
+            new_dataset._parquet_files = self._parquet_files[actual_index:actual_end]
+            return new_dataset
+        elif isinstance(index, int):
+            actual_index = index
+            if actual_index >= self.num_files():
+                raise IndexError("Index out of range")
+            new_dataset = Dataset(self.data_path, self.history_length, self.forecast_horizon, self.stride, self.column_config, True, {})
+            new_dataset._parquet_files = [self._parquet_files[actual_index]]
+            return new_dataset
+        else:
+            raise TypeError("Invalid index type")
     
     def get_num_parquet_files(self) -> int:
         """Return number of parquet files in the dataset."""

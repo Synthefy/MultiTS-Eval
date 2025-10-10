@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-def get_available_models():
+def get_available_models(device: str = "cuda:0"):
     """Get dictionary of available forecasting models.
     
     To add your own custom model:
@@ -24,6 +24,9 @@ def get_available_models():
     
     Then add to the dictionary:
     "my_custom": MyCustomModel(param1=1.5, param2=3.0)
+    
+    Args:
+        device: Device to use for models that support it (e.g., "cuda:0", "cpu")
     """
     from musedfm.baselines import (
         MeanForecast, 
@@ -33,6 +36,7 @@ def get_available_models():
         ExponentialSmoothing
     )
     from musedfm.baselines.linear_regression import LinearRegressionForecast
+    from musedfm.baselines.chronos_forecast import ChronosForecast
     
     return {
         "mean": {"model": MeanForecast(), "univariate": True},
@@ -40,16 +44,17 @@ def get_available_models():
         "linear_trend": {"model": LinearTrend(), "univariate": True},
         "exponential_smoothing": {"model": ExponentialSmoothing(), "univariate": True},
         "arima": {"model": ARIMAForecast(order=(1, 1, 1)), "univariate": True},
-        "linear_regression": {"model": LinearRegressionForecast(), "univariate": False}
+        "linear_regression": {"model": LinearRegressionForecast(), "univariate": False},
+        "chronos": {"model": ChronosForecast(device=device), "univariate": False}
         # Add your custom models here:
         # "my_custom": {"model": MyCustomModel(), "univariate": False},
         # "another_model": {"model": AnotherModel(param1=value1, param2=value2), "univariate": True}
     }
 
 
-def parse_models(model_string: str) -> Dict[str, Any]:
+def parse_models(model_string: str, device: str = "cuda:0") -> Dict[str, Any]:
     """Parse model string and return list of model instances."""
-    available_models = get_available_models()
+    available_models = get_available_models(device=device)
     
     if model_string.lower() == "all":
         return available_models

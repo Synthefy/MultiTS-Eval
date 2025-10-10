@@ -49,6 +49,7 @@ from examples.export_csvs import (
 from examples.eval_musedfm import (
     SaveManager
 )
+from examples.save_submission import save_submission
 
 # Suppress specific statsmodels warnings about ARIMA parameter initialization
 # These warnings occur when ARIMA models encounter non-invertible MA parameters or non-stationary AR parameters
@@ -330,7 +331,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                     continue
                 
                 # Get full dataset name from benchmark path
-                dataset_name = str(dataset.data_path.relative_to(benchmark.benchmark_path))
+                dataset_name = str(dataset.dataset_name)
                 dataset_progress.set_postfix_str(f"Processing: {dataset_name}")
                 dataset_count += 1
                 
@@ -665,7 +666,7 @@ Examples:
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=1048576,
+        default=131072,
         help="Chunk size for saving forecasts (default: 1048576)"
     )
     
@@ -711,6 +712,10 @@ Examples:
     # Generate plots if requested
     if args.plots and '_plot_data' in results:
         generate_forecast_plots(results, output_dir=args.output_dir, limit_windows = -1)
+    
+    # Save submission files
+    submission_dir = os.path.join(args.output_dir, "submissions")
+    save_submission(results, submission_dir)
     
     total_time = time.time() - start_time
     print(f"\nTotal execution time: {total_time:.2f} seconds")

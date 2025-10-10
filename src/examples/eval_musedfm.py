@@ -26,7 +26,7 @@ from musedfm.plotting import plot_window_forecasts
 
 # Import utility and debug functions
 from examples.utils import (
-    _aggregate_metrics, _aggregate_results_by_level
+    _aggregate_metrics, _aggregate_results_by_level, timeout_handler
 )
 from examples.model_handling import (
     parse_models
@@ -40,6 +40,7 @@ from examples.debug import (
 from examples.export_csvs import (
     export_hierarchical_results_to_csv
 )
+from examples.save_submission import save_submission
 # Additional aggressive suppression
 import contextlib
 
@@ -51,7 +52,7 @@ def suppress_all_warnings():
         yield
 
 class SaveManager:
-    def __init__(self, save_path, category_names, model_name, stride=256, history_length=512, forecast_horizon=128, chunk_size=1048576):
+    def __init__(self, save_path, category_names, model_name, stride=256, history_length=512, forecast_horizon=128, chunk_size=65536):
         self.save_path = save_path
         self.category_names = category_names
         self.model_name = model_name
@@ -65,8 +66,11 @@ class SaveManager:
     
     def save_forecasts_interval(self, forecast, category, domain, dataset):
         self.forecast_block.append(forecast)
-        self.last_block_save_path = f"{self.save_path}/forecasts/{category}/{domain}/{dataset}/{self.model_name}_s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_b{self.forecast_block_idx}.parquet"
+        self.last_block_save_path = f"{self.save_path}/forecasts/{self.model_name}/{category}/{domain}/{dataset}/s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_b{self.forecast_block_idx}.parquet"
         if len(self.forecast_block) * self.forecast_horizon > self.chunk_size:
+            # take the product of all the blocks in self.forecast_block
+            total_size = sum(np.prod(block.shape) for block in self.forecast_block)
+
             self.run_saving()
             self.forecast_block = []
             self.forecast_block_idx += 1
@@ -100,7 +104,7 @@ class SaveManager:
                 for domain in self.category_names[category]:
                     for dataset in self.category_names[category][domain]:
                         # find all files in the folder and  sort by forecast_block_idx
-                        files = sorted(glob.glob(f"{self.save_path}/forecasts/{category}/{domain}/{dataset}/{self.model_name}_s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_b*.parquet"), key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))
+                        files = sorted(glob.glob(f"{self.save_path}/forecasts/{self.model_name}/{category}/{domain}/{dataset}/s{self.stride}_w{self.history_length}_f{self.forecast_horizon}_b*.parquet"), key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))
                         for file in files:
                             forecast_block_df = pd.read_parquet(file)
 
@@ -166,7 +170,7 @@ def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows:
                            categories: str = None, domains: str = None, datasets: str = None,
                            collect_plot_data: bool = False, history_length: int = 512, 
                            forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False,
-                           num_plots_to_keep: int = 1, debug_mode: bool = False, chunk_size: int = 1048576, forecast_save_path: str = "./"):
+                           num_plots_to_keep: int = 1, debug_mode: bool = False, chunk_size: int = 65536, forecast_save_path: str = "./"):
     """Run multiple forecasting models on a benchmark and compare their performance."""
     print("=" * 60)
     print("Running Multiple Models on Benchmark")
@@ -367,7 +371,7 @@ Examples:
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=1048576,
+        default=131072,
         help="Chunk size for saving forecasts (default: 1048576)"
     )
     
@@ -403,6 +407,10 @@ Examples:
                                      forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts,
                                      chunk_size=args.chunk_size, forecast_save_path=args.forecast_save_path)
 
+    # Save submission files
+    submission_dir = os.path.join(args.output_dir, "submissions")
+    save_submission(results, submission_dir)
+    
     total_time = time.time() - start_time
     print(f"\nTotal execution time: {total_time:.2f} seconds")
     print("Example completed successfully!")

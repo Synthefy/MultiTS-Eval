@@ -37,18 +37,24 @@ class ARIMAForecast(BaseForecaster):
         if forecast_horizon is None:
             forecast_horizon = 1
         
-        from statsmodels.tsa.arima.model import ARIMA
+        from statsmodels.tsa.statespace.sarimax import SARIMAX
         
         # filter history with nanmean
         history[np.isnan(history)] = np.nanmean(history)
 
+        history_std, history_mean = np.std(history), np.mean(history)
+        history = (history - history_mean) / max(history_std, 1e-10)
+        if np.std(history) < 1e-2:
+            # if the variance is too low, just return the mean
+            return np.full(forecast_horizon, history_mean)
+
         # Fit ARIMA model
-        model = ARIMA(history, order=self.order)
-        fitted_model = model.fit()
+        model = SARIMAX(history, order=self.order, enforce_stationarity=False, enforce_invertibility=False)
+        fitted_model = model.fit(method='lbfgs', maxiter=200, disp=False)
         
         # Generate forecast
         forecast = fitted_model.forecast(steps=forecast_horizon)
-        
+        forecast = forecast * history_std + history_mean
         # Handle different return types from statsmodels
         if hasattr(forecast, 'iloc'):
             return forecast.iloc[:forecast_horizon].values

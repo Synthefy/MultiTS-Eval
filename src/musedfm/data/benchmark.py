@@ -9,6 +9,7 @@ from musedfm.data.category import Category
 from musedfm.data.dataset import Dataset
 from collections import OrderedDict
 
+VERSION = "1.0"
 
 class Benchmark:
     """
