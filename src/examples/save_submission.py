@@ -29,7 +29,7 @@ def save_submission(results: Dict[str, Any], output_dir: str, model_name: Option
             'dataset_results': [
                 {
                     'dataset_name': 'dataset_name',
-                    'metrics': {'MAE': 15.0, 'RMSE': 15.0, 'MAPE': 15.0, 'Uni-MAPE': 18.0, 'NMAE': 9.0},
+                    'metrics': {'MAE': 15.0, 'RMSE': 15.0, 'Multi-MAPE': 15.0, 'Uni-MAPE': 18.0, 'NMAE': 9.0},
                     'window_count': 100
                 },
                 ...
@@ -97,7 +97,7 @@ def save_submission(results: Dict[str, Any], output_dir: str, model_name: Option
             submission_metrics = {
                 'MAE': metrics.get('MAE', 0.0),
                 'RMSE': metrics.get('RMSE', 0.0),
-                'MAPE': metrics.get('MAPE', 0.0),
+                'Multi-MAPE': metrics.get('MAPE', 0.0),
                 'Uni-MAPE': uni_mape,
                 'NMAE': metrics.get('NMAE', 0.0)
             }
@@ -157,7 +157,7 @@ def create_sample_submission(output_path: str) -> None:
             sample_metrics = {
                 "MAE": 15.0,
                 "RMSE": 15.0,
-                "MAPE": 15.0,
+                "Multi-MAPE": 15.0,
                 "Uni-MAPE": 18.0,
                 "NMAE": 9.0
             }

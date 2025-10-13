@@ -130,12 +130,17 @@ def debug_model_performance(model_name: str, dataset_avg_metrics: Dict[str, floa
                           model_dataset_windows: Dict[str, int], model_elapsed_time: float) -> None:
     """Print debug information for model performance."""
     mape_value = dataset_avg_metrics.get('MAPE', 'N/A')
+    nmae_value = dataset_avg_metrics.get('NMAE', 'N/A')
     if isinstance(mape_value, (int, float)) and not np.isnan(mape_value):
         mape_str = f"{mape_value:.2f}%"
-    else:
+    else:   
         mape_str = "N/A"
+    if isinstance(nmae_value, (int, float)) and not np.isnan(nmae_value):
+        nmae_str = f"{nmae_value:.4f}"
+    else:
+        nmae_str = "N/A"
     
-    print(f"    {model_name}: {model_dataset_windows[model_name]} windows in {model_elapsed_time:.2f}s with MAPE {mape_str}")
+    print(f"    {model_name}: {model_dataset_windows[model_name]} windows in {model_elapsed_time:.2f}s with MAPE {mape_str} and NMAE {nmae_str}")
 
 
 def debug_univariate_performance(univariate_model_name: str, univariate_avg_metrics: Dict[str, float],
