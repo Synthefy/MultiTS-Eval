@@ -64,10 +64,10 @@ The primary script for running baseline models with visualization and CSV export
 
 ```bash
 # Run all models on all datasets with plots and CSV export and save exports
-uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-fm-nested --models all --plots --load-cached-counts --output-dir <your target folder>/mused-fm-outputs/results --forecast-save-path <your target folder>/mused-fm-outputs/forecasts
+uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-fm-nested --models all --plots --load-cached-counts --output-dir <your target folder>/mused-fm-outputs/results --forecast-save-path <your target folder>/mused-fm-outputs/forecasts --batch-size 8
 
 # Debug mode (limited windows)
-uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-fm-nested --models all --load-cached-counts --plots --output-dir <your target folder>/results --forecast-save-path <your target folder>/forecasts --windows 200 --debug-mode
+uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-fm-nested --models all --load-cached-counts --plots --output-dir <your target folder>/results --forecast-save-path <your target folder>/forecasts --windows 200 --debug-mode --batch-size 8
 ```
 
 **Key Arguments:**
@@ -81,17 +81,8 @@ uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-f
 Specialized script for just forecast evaluation:
 
 ```bash
-# Run all models with forecast saving
-uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --forecast-save-path /tmp/forecasts
-
-# Run specific models with limited windows
-uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models mean,arima,linear_trend --windows 50 --forecast-save-path /tmp/forecasts
-
-# Run on specific categories with custom parameters
-uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --categories traditional --history-length 512 --forecast-horizon 128 --stride 256 --forecast-save-path /tmp/forecasts
-
 # Use cached window counts for faster execution
-uv run src/examples/eval_musedfm.py --benchmark-path /dev/shm/data/mused-fm-nested --models all --load-cached-counts --forecast-save-path /tmp/forecasts
+uv run src/examples/eval_musedfm.py --benchmark-path <your target folder>mused-fm-nested --models all --load-cached-counts --output-dir <your target folder>/results
 ```
 
 **Key Features:**
