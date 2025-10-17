@@ -26,7 +26,12 @@ def _aggregate_metrics(dataset_results: List[Dict], metric_names: List[str] = ['
     avg_metrics = {}
     for metric in metric_names:
         values = [result['metrics'][metric] for result in dataset_results if metric in result['metrics']]
-        avg_metrics[metric] = np.mean(values) if values else np.nan
+        if values:
+            # Convert to numpy array and use nanmean to skip NaN values
+            values_array = np.array(values)
+            avg_metrics[metric] = np.nanmean(values_array)
+        else:
+            avg_metrics[metric] = np.nan
     
     return avg_metrics, total_windows, dataset_count
 
@@ -63,7 +68,6 @@ def _aggregate_results_by_level(results: Dict, models: Dict, benchmark, level_na
                     'window_count': total_windows,
                     'dataset_count': dataset_count
                 }
-
 
 @contextmanager
 def timeout_handler(seconds):

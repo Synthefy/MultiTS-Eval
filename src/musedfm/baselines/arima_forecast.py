@@ -22,43 +22,55 @@ class ARIMAForecast(BaseForecaster):
         self.order = order
         self._model = None
     
-    def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, forecast_horizon: Optional[int] = None) -> np.ndarray:
+    def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, forecast_horizon: Optional[int] = None, timestamps: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Generate ARIMA forecast.
         
         Args:
-            history: Historical time series data
+            history: Historical time series data (shape: [batch_size, history_length])
             covariates: Optional covariate data (ignored)
+            forecast_horizon: Number of future points to forecast (default: 1)
+            timestamps: Optional timestamp data (ignored)
             forecast_horizon: Number of future points to forecast (default: 1)
             
         Returns:
-            ARIMA forecast values
+            ARIMA forecast values (shape: [batch_size, forecast_horizon])
         """
         if forecast_horizon is None:
             forecast_horizon = 1
         
-        from statsmodels.tsa.statespace.sarimax import SARIMAX
+        batch_size = history.shape[0]
+        forecasts = []
         
-        # filter history with nanmean
-        history[np.isnan(history)] = np.nanmean(history)
+        for i in range(batch_size):
+            from statsmodels.tsa.statespace.sarimax import SARIMAX
+            
+            # filter history with nanmean
+            history_i = history[i].copy()
+            history_i[np.isnan(history_i)] = np.nanmean(history_i)
 
-        history_std, history_mean = np.std(history), np.mean(history)
-        history = (history - history_mean) / max(history_std, 1e-10)
-        if np.std(history) < 1e-2:
-            # if the variance is too low, just return the mean
-            return np.full(forecast_horizon, history_mean)
-
-        # Fit ARIMA model
-        model = SARIMAX(history, order=self.order, enforce_stationarity=False, enforce_invertibility=False)
-        fitted_model = model.fit(method='lbfgs', maxiter=200, disp=False)
+            history_std, history_mean = np.std(history_i), np.mean(history_i)
+            history_i = (history_i - history_mean) / max(history_std, 1e-10)
+            if np.std(history_i) < 1e-2:
+                # if the variance is too low, just return the mean
+                forecast_i = np.full(forecast_horizon, history_mean)
+            else:
+                # Fit ARIMA model
+                model = SARIMAX(history_i, order=self.order, enforce_stationarity=False, enforce_invertibility=False)
+                fitted_model = model.fit(method='lbfgs', maxiter=200, disp=False)
+                
+                # Generate forecast
+                forecast_i = fitted_model.forecast(steps=forecast_horizon)
+                forecast_i = forecast_i * history_std + history_mean
+                
+                # Handle different return types from statsmodels
+                if hasattr(forecast_i, 'iloc'):
+                    forecast_i = forecast_i.iloc[:forecast_horizon].values
+                elif hasattr(forecast_i, '__getitem__'):
+                    forecast_i = np.array([forecast_i[j] for j in range(forecast_horizon)])
+                else:
+                    forecast_i = np.array([float(forecast_i)] * forecast_horizon)
+            
+            forecasts.append(forecast_i)
         
-        # Generate forecast
-        forecast = fitted_model.forecast(steps=forecast_horizon)
-        forecast = forecast * history_std + history_mean
-        # Handle different return types from statsmodels
-        if hasattr(forecast, 'iloc'):
-            return forecast.iloc[:forecast_horizon].values
-        elif hasattr(forecast, '__getitem__'):
-            return np.array([forecast[i] for i in range(forecast_horizon)])
-        else:
-            return np.array([float(forecast)] * forecast_horizon)
+        return np.stack(forecasts, axis=0)  # [batch_size, forecast_horizon]

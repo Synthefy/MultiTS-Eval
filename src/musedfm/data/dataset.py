@@ -220,7 +220,7 @@ class Dataset:
             return [target_spec]
     
     def __init__(self, data_path: str, history_length: int = 30, forecast_horizon: int = 1, 
-                 stride: int = 1, column_config: Optional[Dict[str, Any]] = None, needs_counting: bool = False, dataset_target_count: Optional[Dict[str, int]] = None):
+                 stride: int = 1, column_config: Optional[Dict[str, Any]] = None, needs_counting: bool = False, dataset_target_count: Optional[Dict[str, int]] = None, batch_size: int = 1):
         """
         Initialize dataset from parquet files.
         
@@ -236,6 +236,7 @@ class Dataset:
                               'covariate_cols': ['col3', 'col4'] or callable
                           }
             needs_counting: If True, count windows
+            batch_size: Number of windows to collect in each batch (default: 1 for single window mode)
         """
         self.data_path = Path(data_path)
         self.dataset_name = self.data_path.name
@@ -243,6 +244,7 @@ class Dataset:
         self.forecast_horizon = forecast_horizon
         self.stride = stride
         self.column_config = column_config
+        self.batch_size = batch_size
         self._windows: List[Window] = []
         self.target_count = len(column_config['target_cols']) if column_config is not None and 'target_cols' in column_config else 1
         
@@ -260,7 +262,7 @@ class Dataset:
     def with_custom_config(cls, data_path: str, timestamp_col: str, 
                           target_cols: Union[List[str], str], 
                           metadata_cols: Union[List[str], str],
-                          history_length: int = 30, forecast_horizon: int = 1, stride: int = 1) -> 'Dataset':
+                          history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, batch_size: int = 1) -> 'Dataset':
         """
         Create a dataset with custom column configuration.
         
@@ -272,6 +274,7 @@ class Dataset:
             history_length: Number of historical points to use for forecasting
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
+            batch_size: Number of windows to collect in each batch
             
         Returns:
             Dataset instance with custom configuration
@@ -282,11 +285,11 @@ class Dataset:
             'metadata_cols': metadata_cols,
             'from_json_config': True
         }
-        return cls(data_path, history_length, forecast_horizon, stride, column_config)
+        return cls(data_path, history_length, forecast_horizon, stride, column_config, batch_size=batch_size)
     
     @classmethod
     def from_config(cls, data_path: str, dataset_name: str, 
-                   history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, needs_counting: bool = True) -> 'Dataset':
+                   history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, needs_counting: bool = True, batch_size: int = 1) -> 'Dataset':
         """
         Create a dataset using configuration from the JSON config file.
         
@@ -297,6 +300,7 @@ class Dataset:
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
             needs_counting: If True, count windows
+            batch_size: Number of windows to collect in each batch
         Returns:
             Dataset instance with configuration from JSON file
         """
@@ -309,7 +313,7 @@ class Dataset:
         # Check if this dataset uses a special loader
         if 'special_loader' in dataset_config:
             return cls._create_with_special_loader(data_path, dataset_name, dataset_config, 
-                                                 history_length, forecast_horizon, stride, needs_counting)
+                                                 history_length, forecast_horizon, stride, needs_counting, batch_size)
         
         # Create a special config that will be processed by the generalized loader
         column_config = {
@@ -319,11 +323,11 @@ class Dataset:
             'from_json_config': True  # Flag to indicate this comes from JSON config
         }
         
-        return cls(data_path, history_length, forecast_horizon, stride, column_config, needs_counting)
+        return cls(data_path, history_length, forecast_horizon, stride, column_config, needs_counting, batch_size=batch_size)
     
     @classmethod
     def _create_with_special_loader(cls, data_path: str, dataset_name: str, dataset_config: Dict[str, Any],
-                                  history_length: int, forecast_horizon: int, stride: int, needs_counting: bool = True) -> 'Dataset':
+                                  history_length: int, forecast_horizon: int, stride: int, needs_counting: bool = True, batch_size: int = 1) -> 'Dataset':
         """
         Create a dataset using a special loader for datasets with unique formats.
         
@@ -335,6 +339,7 @@ class Dataset:
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
             needs_counting: If True, count windows
+            batch_size: Number of windows to collect in each batch
         Returns:
             Dataset instance with special loader
         """
@@ -367,7 +372,7 @@ class Dataset:
         }
         
         # Create dataset instance with the dataframes
-        dataset = cls(data_path, history_length, forecast_horizon, stride, column_config, needs_counting)
+        dataset = cls(data_path, history_length, forecast_horizon, stride, column_config, needs_counting, batch_size=batch_size)
         dataset.dataset_name = dataset_name
         return dataset
     
@@ -378,7 +383,7 @@ class Dataset:
             self._parquet_files = self.column_config['dataframes']
             return
             
-        self._parquet_files = list(self.data_path.rglob("*.parquet"))
+        self._parquet_files = sorted(list(self.data_path.rglob("*.parquet")))
         
         if not self._parquet_files:
             raise ValueError(f"No parquet files found in {self.data_path}")
@@ -702,15 +707,18 @@ class Dataset:
                 if timestamp_data is not None:
                     timestamps = timestamp_data[start_idx:target_end]
                 
-                window = Window(history, target, covariates, timestamps)
-                windows.append(window)
+                # Create padding masks (all False for individual windows)
+                history_padding = np.zeros_like(history, dtype=bool)
+                target_padding = np.zeros_like(target, dtype=bool)
                 
-            elif available_data >= MIN_HISTORY_FORECAST_LENGTH * 2:
-                # Split available data equally between history and forecast
-                actual_history_length = available_data // 2
+                window = Window(history, target, covariates, timestamps, history_padding, target_padding)
+                windows.append(window)
+            elif available_data >= self.forecast_horizon * 2:
+                # Split available data so that the forecast is equal to forecast length, and the history is the remainder
+                actual_history_length = available_data - self.forecast_horizon
                 history_end = start_idx + actual_history_length
                 target_start = history_end
-                target_end = start_idx + available_data
+                target_end = target_start + self.forecast_horizon
                 
                 history = target_series[start_idx:history_end]
                 target = target_series[target_start:target_end]
@@ -726,10 +734,219 @@ class Dataset:
                 if timestamp_data is not None:
                     timestamps = timestamp_data[start_idx:target_end]
                 
-                window = Window(history, target, covariates, timestamps)
+                # Create padding masks (all False for individual windows)
+                history_padding = np.zeros_like(history, dtype=bool)
+                target_padding = np.zeros_like(target, dtype=bool)
+                
+                window = Window(history, target, covariates, timestamps, history_padding, target_padding)
+                windows.append(window)
+                
+            elif available_data >= MIN_HISTORY_FORECAST_LENGTH * 2:
+                # Split available data equally between history and forecast, but limit target to forecast_horizon
+                actual_history_length = available_data // 2
+                history_end = start_idx + actual_history_length
+                target_start = history_end
+                target_end = min(target_start + self.forecast_horizon, start_idx + available_data)
+                
+                history = target_series[start_idx:history_end]
+                target = target_series[target_start:target_end]
+                covariates = covariate_data[start_idx:history_end]
+                
+                # Skip windows where target is completely NaN
+                if np.all(np.isnan(target)) or np.all(np.isnan(history)):
+                    print(f"Skipping window with completely NaN target: {start_idx}")
+                    continue
+                
+                # Extract timestamps for this window if available
+                timestamps = None
+                if timestamp_data is not None:
+                    timestamps = timestamp_data[start_idx:target_end]
+                
+                # Create padding masks (all False for individual windows)
+                history_padding = np.zeros_like(history, dtype=bool)
+                target_padding = np.zeros_like(target, dtype=bool)
+                
+                window = Window(history, target, covariates, timestamps, history_padding, target_padding)
                 windows.append(window)
             # Skip windows that don't meet minimum requirements
         return windows
+    
+    def _create_batched_window(self, windows: List[Window]) -> Window:
+        """
+        Create a single batched window from a list of individual windows.
+        
+        Args:
+            windows: List of individual windows to batch together
+            
+        Returns:
+            Single Window object containing batched data
+        """
+        if not windows:
+            raise ValueError("Cannot create batched window from empty list")
+        
+        # Extract data from all windows
+        histories = []
+        targets = []
+        covariates_list = []
+        timestamps_list = []
+        
+        for window in windows:
+            histories.append(window.history())
+            targets.append(window.target())
+            covariates_list.append(window.covariates())
+            if window.has_timestamps:
+                timestamps_list.append(window.timestamps())
+            else:
+                timestamps_list.append(None)
+        
+        # Handle variable shapes by padding to expected dimensions
+        actual_history_lengths = [h.shape[0] for h in histories]
+        actual_forecast_lengths = [t.shape[0] for t in targets]
+        expected_history_length = max(actual_history_lengths)
+        expected_forecast_horizon = max(actual_forecast_lengths)  # Use max forecast length in batch
+        
+        # Pad/truncate histories to expected length (pad at the beginning to preserve recent data)
+        padded_histories = []
+        history_padding_masks = []
+        for history in histories:
+            if history.shape[0] < expected_history_length:
+                # Pad with first value (forward-fill) at the beginning
+                if len(history) > 0 and not np.all(np.isnan(history)):
+                    first_valid = history[~np.isnan(history)][0] if np.any(~np.isnan(history)) else 0.0
+                else:
+                    first_valid = 0.0
+                padding_length = expected_history_length - history.shape[0]
+                padding = np.full(padding_length, first_valid)
+                padded_history = np.concatenate([padding, history])
+                # Create padding mask (True = padded positions)
+                padding_mask = np.concatenate([np.ones(padding_length, dtype=bool), np.zeros(history.shape[0], dtype=bool)])
+            elif history.shape[0] > expected_history_length:
+                # Truncate to expected length (keep last N values)
+                padded_history = history[-expected_history_length:]
+                padding_mask = np.zeros(expected_history_length, dtype=bool)
+            else:
+                padded_history = history
+                padding_mask = np.zeros(expected_history_length, dtype=bool)
+            padded_histories.append(padded_history)
+            history_padding_masks.append(padding_mask)
+        
+        # Pad/truncate targets to expected length (pad at the end to preserve immediate predictions)
+        padded_targets = []
+        target_padding_masks = []
+        for target in targets:
+            if target.shape[0] < expected_forecast_horizon:
+                # Pad with last value (forward-fill) at the end
+                if len(target) > 0 and not np.all(np.isnan(target)):
+                    last_valid = target[~np.isnan(target)][-1] if np.any(~np.isnan(target)) else 0.0
+                else:
+                    last_valid = 0.0
+                padding_length = expected_forecast_horizon - target.shape[0]
+                padding = np.full(padding_length, last_valid)
+                padded_target = np.concatenate([target, padding])
+                # Create padding mask (True = padded positions)
+                padding_mask = np.concatenate([np.zeros(target.shape[0], dtype=bool), np.ones(padding_length, dtype=bool)])
+            elif target.shape[0] > expected_forecast_horizon:
+                # Truncate to expected length (keep first N values)
+                padded_target = target[:expected_forecast_horizon]
+                padding_mask = np.zeros(expected_forecast_horizon, dtype=bool)
+            else:
+                padded_target = target
+                padding_mask = np.zeros(expected_forecast_horizon, dtype=bool)
+            padded_targets.append(padded_target)
+            target_padding_masks.append(padding_mask)
+        
+        # Pad/truncate covariates to expected length and dimensions
+        padded_covariates_list = []
+        
+        # First, determine the maximum covariate dimension across all windows
+        max_covariate_dim = 0
+        for covariates in covariates_list:
+            if covariates is not None and covariates.shape[1] > max_covariate_dim:
+                max_covariate_dim = covariates.shape[1]
+        
+        # Ensure we have at least dimension 1 for covariates
+        if max_covariate_dim == 0:
+            max_covariate_dim = 1
+        
+        for covariates in covariates_list:
+            if covariates is None:
+                # Create zero covariates if None
+                padded_covariates = np.zeros((expected_history_length, max_covariate_dim))
+            else:
+                # Pad/truncate time dimension
+                if covariates.shape[0] < expected_history_length:
+                    # Pad with first row values (forward-fill) at the beginning
+                    if covariates.shape[0] > 0 and not np.all(np.isnan(covariates)):
+                        first_row = covariates[0]
+                        # Replace any NaN values in first row with 0
+                        first_row = np.where(np.isnan(first_row), 0.0, first_row)
+                    else:
+                        first_row = np.zeros(covariates.shape[1])
+                    padding_shape = (expected_history_length - covariates.shape[0], covariates.shape[1])
+                    padding = np.tile(first_row, (padding_shape[0], 1))
+                    padded_covariates = np.vstack([padding, covariates])
+                elif covariates.shape[0] > expected_history_length:
+                    # Truncate to expected length (keep last N values)
+                    padded_covariates = covariates[-expected_history_length:]
+                else:
+                    padded_covariates = covariates
+                
+                # Pad covariate dimension if needed
+                if padded_covariates.shape[1] < max_covariate_dim:
+                    padding_shape = (padded_covariates.shape[0], max_covariate_dim - padded_covariates.shape[1])
+                    padding = np.zeros(padding_shape)
+                    padded_covariates = np.hstack([padded_covariates, padding])
+            
+            padded_covariates_list.append(padded_covariates)
+        
+        # Stack arrays to create batch dimensions
+        batched_history = np.stack(padded_histories, axis=0)  # [batch_size, history_length]
+        batched_target = np.stack(padded_targets, axis=0)      # [batch_size, forecast_horizon]
+        batched_covariates = np.stack(padded_covariates_list, axis=0)  # [batch_size, history_length, covariate_dim]
+        
+        # Stack padding masks
+        batched_history_padding = np.stack(history_padding_masks, axis=0)  # [batch_size, history_length]
+        batched_target_padding = np.stack(target_padding_masks, axis=0)    # [batch_size, forecast_horizon]
+        
+        # Handle timestamps (pad/truncate to consistent length)
+        batched_timestamps = None
+        if all(ts is not None for ts in timestamps_list):
+            # Calculate expected timestamp length (history + forecast)
+            expected_timestamp_length = expected_history_length + expected_forecast_horizon
+            
+            # Pad/truncate timestamps to expected length
+            padded_timestamps_list = []
+            for timestamps in timestamps_list:
+                if timestamps.shape[0] < expected_timestamp_length:
+                    # For timestamps, we need to handle dtype properly
+                    # Create padding with the same dtype as timestamps
+                    if np.issubdtype(timestamps.dtype, np.datetime64):
+                        # Use NaT (Not a Time) for datetime64
+                        padding = np.full(expected_timestamp_length - timestamps.shape[0], np.datetime64('NaT'))
+                    else:
+                        # Use NaN for other numeric types
+                        padding = np.full(expected_timestamp_length - timestamps.shape[0], np.nan)
+                    padded_timestamps = np.concatenate([timestamps, padding])
+                elif timestamps.shape[0] > expected_timestamp_length:
+                    # Truncate to expected length (keep first N values)
+                    padded_timestamps = timestamps[:expected_timestamp_length]
+                else:
+                    padded_timestamps = timestamps
+                padded_timestamps_list.append(padded_timestamps)
+            
+            batched_timestamps = np.stack(padded_timestamps_list, axis=0)
+        
+        # Create batched window
+        batched_window = Window(
+            history=batched_history,
+            target=batched_target,
+            covariates=batched_covariates,
+            timestamps=batched_timestamps,
+            history_padding=batched_history_padding,
+            target_padding=batched_target_padding
+        )
+        
+        return batched_window
 
     def _load_windows_general(self, df: pd.DataFrame) -> List[Window]:
         """Generalized window loading function."""
@@ -791,36 +1008,65 @@ class Dataset:
         return self._lazy_iterator()
     
     def _lazy_iterator(self) -> Iterator[Window]:
-        """Lazy iterator that loads parquet files on-demand."""
+        """Lazy iterator that loads parquet files on-demand and always creates batched windows."""
         # Reset state for fresh iteration
         self._current_parquet_index = 0
         self._current_window_index = 0
         self._windows = []
         total_windows_yielded = 0
+        max_iterations = len(self._parquet_files) * 10  # Safety limit to prevent infinite loops
+        iteration_count = 0
         
-        while self._current_parquet_index < len(self._parquet_files):
+        while self._current_parquet_index < len(self._parquet_files) or len(self._windows) > 0:
+            iteration_count += 1
+            if iteration_count > max_iterations:
+                print(f"Warning: Maximum iterations ({max_iterations}) reached in dataset iterator. Breaking to prevent infinite loop.")
+                break
+                
             # Load windows from current parquet file if not already loaded
-            if not self._windows:
+            if not self._windows and self._current_parquet_index < len(self._parquet_files):
                 parquet_file = self._parquet_files[self._current_parquet_index]
                 self._windows = self._prep_windows_from_file(parquet_file)
                 self._current_window_index = 0
+                self._current_parquet_index += 1
+                
+                # If all files have been processed and no windows found, break
+                if self._current_parquet_index >= len(self._parquet_files) and not self._windows:
+                    break
             
-            # Yield windows from current parquet file
-            while self._current_window_index < len(self._windows):
-                total_windows_yielded += 1
-                # if total_windows_yielded < 10000:
-                #     continue
-                yield self._windows[self._current_window_index]
-                self._current_window_index += 1
-                # Kill process at window 4019 to debug the hang
-                # if total_windows_yielded == 10780:
-                #     print(f"🚨 KILLING PROCESS AT WINDOW {total_windows_yielded} FOR DEBUGGING")
-                #     import os
-                #     os._exit(1)
+            # Collect windows until we have enough for a batch or run out of windows
+            batch_windows = []
+            while len(batch_windows) < self.batch_size and (self._current_window_index < len(self._windows) or self._current_parquet_index < len(self._parquet_files)):
+                # If we've exhausted current file's windows, load next file
+                if self._current_window_index >= len(self._windows) and self._current_parquet_index < len(self._parquet_files):
+                    parquet_file = self._parquet_files[self._current_parquet_index]
+                    self._windows = self._prep_windows_from_file(parquet_file)
+                    self._current_window_index = 0
+                    self._current_parquet_index += 1
+                    
+                    # If the loaded file has no windows, break out of inner loop to try next file
+                    if not self._windows:
+                        break
+                
+                # Add windows from current file to batch
+                remaining_in_file = len(self._windows) - self._current_window_index
+                remaining_for_batch = self.batch_size - len(batch_windows)
+                windows_to_add = min(remaining_in_file, remaining_for_batch)
+                
+                for i in range(windows_to_add):
+                    batch_windows.append(self._windows[self._current_window_index + i])
+                
+                self._current_window_index += windows_to_add
             
-            # Move to next parquet file
-            self._current_parquet_index += 1
-            self._windows = []  # Clear windows to force reload of next file
+            # Yield batch if we have any windows
+            if batch_windows:
+                batched_window = self._create_batched_window(batch_windows)
+                total_windows_yielded += len(batch_windows)
+                yield batched_window
+            else:
+                # If no batch was created and we've processed all files, break
+                if self._current_parquet_index >= len(self._parquet_files):
+                    break
     
     def __len__(self) -> int:
         """Return total number of windows across all parquet files."""
@@ -838,14 +1084,14 @@ class Dataset:
             # Handle nested slicing
             actual_index = index.start if index.start else 0
             actual_end = index.stop if index.stop else self.num_files()
-            new_dataset = Dataset(self.data_path, self.history_length, self.forecast_horizon, self.stride, self.column_config, True, {})
+            new_dataset = Dataset(self.data_path, self.history_length, self.forecast_horizon, self.stride, self.column_config, True, {}, self.batch_size)
             new_dataset._parquet_files = self._parquet_files[actual_index:actual_end]
             return new_dataset
         elif isinstance(index, int):
             actual_index = index
             if actual_index >= self.num_files():
                 raise IndexError("Index out of range")
-            new_dataset = Dataset(self.data_path, self.history_length, self.forecast_horizon, self.stride, self.column_config, True, {})
+            new_dataset = Dataset(self.data_path, self.history_length, self.forecast_horizon, self.stride, self.column_config, True, {}, self.batch_size)
             new_dataset._parquet_files = [self._parquet_files[actual_index]]
             return new_dataset
         else:
@@ -881,12 +1127,21 @@ class Dataset:
         # Aggregate results from all windows
         all_results = [window.evaluate() for window in self._windows]
         
-        # Compute mean metrics
+        # Get metric names from the first result
+        metric_names = list(all_results[0].keys())
+        
+        # Collect all metric vectors from all windows
+        all_metric_values = {metric: [] for metric in metric_names}
+        
+        for result in all_results:
+            for metric in metric_names:
+                all_metric_values[metric].extend(result[metric])
+        
+        # Compute single nanmean across all individual window metrics
         aggregated = {}
-        for metric in all_results[0].keys():
-            values = [result[metric] for result in all_results]
-            aggregated[metric] = np.mean(values)
-            aggregated[f"{metric}_std"] = np.std(values)
+        for metric in metric_names:
+            aggregated[metric] = np.nanmean(all_metric_values[metric]) if all_metric_values[metric] else np.nan
+            aggregated[f"{metric}_std"] = np.nanstd(all_metric_values[metric]) if all_metric_values[metric] else np.nan
         
         return aggregated
     

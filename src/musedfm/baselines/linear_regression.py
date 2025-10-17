@@ -40,116 +40,125 @@ class LinearRegressionForecast:
         self.covariate_std = None
     
     def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, 
-                 forecast_horizon: int = 1) -> np.ndarray:
+                 forecast_horizon: Optional[int] = None, timestamps: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Generate forecast using simple linear regression on the whole history.
         
         Args:
-            history: Historical target values
-            covariates: Historical covariate values (ignored for simplicity)
+            history: Historical target values (shape: [batch_size, history_length])
+            covariates: Historical covariate values (shape: [batch_size, history_length, covariate_dim])
             forecast_horizon: Number of steps to forecast
+            timestamps: Optional timestamp data (ignored)
             
         Returns:
-            Array of forecasted values
+            Array of forecasted values (shape: [batch_size, forecast_horizon])
         """
-        if len(history) < 2:
-            # Fallback to mean if insufficient history
-            return np.full(forecast_horizon, np.mean(history))
+        if forecast_horizon is None:
+            forecast_horizon = 1
         
-        # Handle NaN values in history
-        if np.any(np.isnan(history)):
-            # Replace NaN values with forward fill, then backward fill
-            history = pd.Series(history).ffill().bfill().values
-            # If still NaN, replace with mean (handle empty slice case)
-            if np.any(np.isnan(history)):
-                # Check if all values are NaN to avoid empty slice warning
-                if np.all(np.isnan(history)):
-                    # If all values are NaN, use 0 as fallback
-                    history = np.zeros_like(history)
-                else:
-                    # Use nanmean only if there are some non-NaN values
-                    history = np.nan_to_num(history, nan=np.nanmean(history))
-        
-        # Handle NaN values in covariates
-        if covariates is not None and np.any(np.isnan(covariates)):
-            # Replace NaN values with mean for each covariate column (handle empty slice case)
-            for col in range(covariates.shape[1]):
-                if np.all(np.isnan(covariates[:, col])):
-                    covariates[:, col] = 0.0
-                else:
-                    covariates[:, col] = np.nan_to_num(covariates[:, col], nan=np.nanmean(covariates[:, col]))
-            # # Check if any columns are entirely NaN to avoid empty slice warning
-            # nan_means = np.nanmean(covariates, axis=0)
-            # # Replace NaN means (from entirely NaN columns) with 0
-            # nan_means = np.nan_to_num(nan_means, nan=0.0)
-            # covariates = np.nan_to_num(covariates, nan=nan_means)
-
-        
-        # Prepare features for regression
-        if covariates is not None and len(covariates) > 0:
-            # Use both time indices and covariates
-            time_features = np.arange(len(history)).reshape(-1, 1)
-            # Ensure covariates have the same length as history
-            if len(covariates) >= len(history):
-                covariate_features = covariates[:len(history)]
-            else:
-                # Pad covariates if shorter than history
-                padding = np.zeros((len(history) - len(covariates), covariates.shape[1]))
-                covariate_features = np.vstack([covariates, padding])
-            
-            # Combine time and covariate features
-            X = np.hstack([time_features, covariate_features])
-        else:
-            # Use only time indices if no covariates
-            X = np.arange(len(history)).reshape(-1, 1)
-        
-        y = history  # Target values
-        
-        # Train linear regression model only if not already trained with same dimensions
-        if not hasattr(self, 'model') or self.model is None or not hasattr(self.model, 'coef_') or self.model.coef_.shape[0] != X.shape[1]:
-            # print(f"Debug: Training model with {X.shape[1]} features")
-            self.model = LinearRegression()
-            self.model.fit(X, y)
-        
-        # Store history info for plotting
-        self.history_mean = np.mean(history)
-        self.history_std = np.std(history)
-        self.history_length = len(history)
-        
-        # Generate forecasts
+        batch_size = history.shape[0]
         forecasts = []
-        for i in range(forecast_horizon):
-            # Predict next time step
-            next_time = len(history) + i
-            
-            if covariates is not None and len(covariates) > 0:
-                # Use future covariate values if available
-                covariate_idx = len(history) + i
-                if covariate_idx < len(covariates):
-                    covariate_features = covariates[covariate_idx]
-                else:
-                    # Use last available covariate values
-                    covariate_features = covariates[-1]
-                
-                # Combine time and covariate features
-                features = np.hstack([[next_time], covariate_features])
-            else:
-                # Use only time index
-                features = [next_time]
-            
-            # Ensure features match training dimensions
-            if len(features) != self.model.coef_.shape[0]:
-                if len(features) < self.model.coef_.shape[0]:
-                    # Pad with zeros
-                    features = np.pad(features, (0, self.model.coef_.shape[0] - len(features)), 'constant')
-                else:
-                    # Truncate
-                    features = features[:self.model.coef_.shape[0]]
-            
-            pred = self.model.predict([features])[0]
-            forecasts.append(pred)
         
-        return np.array(forecasts)
+        for i in range(batch_size):
+            # Extract covariates for this sample if available
+            sample_covariates = None
+            if covariates is not None and covariates.ndim == 3:
+                sample_covariates = covariates[i]
+            elif covariates is not None and covariates.ndim == 2:
+                # Same covariates for all samples
+                sample_covariates = covariates
+            
+            history_i = history[i]
+            
+            if len(history_i) < 2:
+                # Fallback to mean if insufficient history
+                forecast_i = np.full(forecast_horizon, np.mean(history_i))
+            else:
+                # Handle NaN values in history
+                if np.any(np.isnan(history_i)):
+                    # Replace NaN values with forward fill, then backward fill
+                    history_i = pd.Series(history_i).ffill().bfill().values
+                    # If still NaN, replace with mean (handle empty slice case)
+                    if np.any(np.isnan(history_i)):
+                        # Check if all values are NaN to avoid empty slice warning
+                        if np.all(np.isnan(history_i)):
+                            # If all values are NaN, use 0 as fallback
+                            history_i = np.zeros_like(history_i)
+                        else:
+                            # Use nanmean only if there are some non-NaN values
+                            history_i = np.nan_to_num(history_i, nan=np.nanmean(history_i))
+                
+                # Handle NaN values in covariates
+                if sample_covariates is not None and np.any(np.isnan(sample_covariates)):
+                    # Replace NaN values with mean for each covariate column (handle empty slice case)
+                    for col in range(sample_covariates.shape[1]):
+                        if np.all(np.isnan(sample_covariates[:, col])):
+                            sample_covariates[:, col] = 0.0
+                        else:
+                            sample_covariates[:, col] = np.nan_to_num(sample_covariates[:, col], nan=np.nanmean(sample_covariates[:, col]))
+
+                # Prepare features for regression
+                if sample_covariates is not None and len(sample_covariates) > 0:
+                    # Use both time indices and covariates
+                    time_features = np.arange(len(history_i)).reshape(-1, 1)
+                    # Ensure covariates have the same length as history
+                    if len(sample_covariates) >= len(history_i):
+                        covariate_features = sample_covariates[:len(history_i)]
+                    else:
+                        # Pad covariates if shorter than history
+                        padding = np.zeros((len(history_i) - len(sample_covariates), sample_covariates.shape[1]))
+                        covariate_features = np.vstack([sample_covariates, padding])
+                    
+                    # Combine time and covariate features
+                    X = np.hstack([time_features, covariate_features])
+                else:
+                    # Use only time indices if no covariates
+                    X = np.arange(len(history_i)).reshape(-1, 1)
+                
+                y = history_i  # Target values
+                
+                # Train linear regression model
+                model = LinearRegression()
+                model.fit(X, y)
+                
+                # Generate forecasts
+                forecast_i = []
+                for j in range(forecast_horizon):
+                    # Predict next time step
+                    next_time = len(history_i) + j
+                    
+                    if sample_covariates is not None and len(sample_covariates) > 0:
+                        # Use future covariate values if available
+                        covariate_idx = len(history_i) + j
+                        if covariate_idx < len(sample_covariates):
+                            covariate_features = sample_covariates[covariate_idx]
+                        else:
+                            # Use last available covariate values
+                            covariate_features = sample_covariates[-1]
+                        
+                        # Combine time and covariate features
+                        features = np.hstack([[next_time], covariate_features])
+                    else:
+                        # Use only time index
+                        features = [next_time]
+                    
+                    # Ensure features match training dimensions
+                    if len(features) != model.coef_.shape[0]:
+                        if len(features) < model.coef_.shape[0]:
+                            # Pad with zeros
+                            features = np.pad(features, (0, model.coef_.shape[0] - len(features)), 'constant')
+                        else:
+                            # Truncate
+                            features = features[:model.coef_.shape[0]]
+                    
+                    pred = model.predict([features])[0]
+                    forecast_i.append(pred)
+                
+                forecast_i = np.array(forecast_i)
+            
+            forecasts.append(forecast_i)
+        
+        return np.stack(forecasts, axis=0)  # [batch_size, forecast_horizon]
     
     def plot_linear_fit(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, 
                        save_path: Optional[str] = None):

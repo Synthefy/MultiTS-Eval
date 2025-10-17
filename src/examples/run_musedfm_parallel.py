@@ -48,8 +48,8 @@ from examples.model_handling import (
 from examples.debug import (
     _initialize_nan_tracking, _update_nan_tracking, _check_window_nan_values,
     _report_nan_statistics, plot_high_mape_windows,
-    debug_model_performance, debug_univariate_performance, debug_forecast_failure,
-    debug_forecast_length_mismatch, debug_model_summary
+    debug_model_performance, debug_univariate_performance,
+    debug_model_summary
 )
 from examples.export_csvs import (
     export_hierarchical_results_to_csv
@@ -154,7 +154,7 @@ def _process_dataset_slice(args):
             if not model["univariate"]:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
+                    multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length, window.timestamps())
 
                 # Handle failed forecasts
                 if multivariate_forecast is None:
@@ -163,7 +163,7 @@ def _process_dataset_slice(args):
             # Generate univariate forecast
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                univariate_forecast = model["model"].forecast(window.history(), None, target_length)
+                univariate_forecast = model["model"].forecast(window.history(), None, target_length, window.timestamps())
 
             # Handle failed forecasts
             if univariate_forecast is None:
@@ -614,21 +614,21 @@ def _calculate_dataset_metrics(model_dataset_results, model_name):
     if not model_dataset_results[model_name]:
         return {}
     
-    # For parallel processing, we have a list of metric dictionaries
-    # We need to aggregate them directly without window_count
-    all_metrics = model_dataset_results[model_name]
+    # Get metric names from the first result
+    metric_names = list(model_dataset_results[model_name][0].keys())
     
-    if not all_metrics:
-        return {}
+    # Collect all metric vectors from all batches
+    all_metric_values = {metric: [] for metric in metric_names}
     
-    # Calculate average for each metric
+    for result in model_dataset_results[model_name]:
+        # Each result now contains metric vectors instead of scalars
+        for metric in metric_names:
+            all_metric_values[metric].extend(result[metric])
+    
+    # Calculate single nanmean across all individual window metrics
     avg_metrics = {}
-    metric_keys = all_metrics[0].keys()
-    
-    for key in metric_keys:
-        values = [result[key] for result in all_metrics if key in result]
-        if values:
-            avg_metrics[key] = np.mean(values)
+    for metric in metric_names:
+        avg_metrics[metric] = np.nanmean(all_metric_values[metric]) if all_metric_values[metric] else np.nan
     
     return avg_metrics
 
@@ -644,16 +644,21 @@ def _process_univariate_results(model_name, model, model_dataset_results, model_
         
         # Calculate average metrics for univariate results (parallel processing style)
         if model_dataset_results[univariate_model_name]:
-            all_metrics = model_dataset_results[univariate_model_name]
+            # Get metric names from the first result
+            metric_names = list(model_dataset_results[univariate_model_name][0].keys())
             
-            # Calculate average for each metric
+            # Collect all metric vectors from all batches
+            all_metric_values = {metric: [] for metric in metric_names}
+            
+            for result in model_dataset_results[univariate_model_name]:
+                # Each result now contains metric vectors instead of scalars
+                for metric in metric_names:
+                    all_metric_values[metric].extend(result[metric])
+            
+            # Calculate single nanmean across all individual window metrics
             avg_metrics = {}
-            metric_keys = all_metrics[0].keys()
-            
-            for key in metric_keys:
-                values = [result[key] for result in all_metrics if key in result]
-                if values:
-                    avg_metrics[key] = np.mean(values)
+            for metric in metric_names:
+                avg_metrics[metric] = np.nanmean(all_metric_values[metric]) if all_metric_values[metric] else np.nan
             
             univariate_avg_metrics = avg_metrics
         

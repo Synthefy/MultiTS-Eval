@@ -17,7 +17,7 @@ class Benchmark:
     Simple orchestrator for evaluations and exports.
     """
     
-    def __init__(self, benchmark_path: str, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False):
+    def __init__(self, benchmark_path: str, history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False, batch_size: int = 1):
         """
         Initialize benchmark from directory containing multiple category directories.
         
@@ -27,11 +27,13 @@ class Benchmark:
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
             load_cached_counts: If True, load window counts from cached JSON files instead of generating
+            batch_size: Number of windows to collect in each batch (default: 1 for single window mode)
         """
         self.benchmark_path = Path(benchmark_path)
         self.history_length = history_length
         self.forecast_horizon = forecast_horizon
         self.stride = stride
+        self.batch_size = batch_size
         self.load_cached_counts = load_cached_counts
         self.categories: List[Category] = []
         self._data_hierarchy = self._load_data_hierarchy()
@@ -92,7 +94,7 @@ class Benchmark:
         
         self.categories = OrderedDict()
         for category_path in category_candidates:
-            category = Category(str(category_path), self.benchmark_path, self.dataset_domain_map, self.dataset_category_map, self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, self.load_cached_counts)
+            category = Category(str(category_path), self.benchmark_path, self.dataset_domain_map, self.dataset_category_map, self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, self.load_cached_counts, self.batch_size)
             self.categories[category.category] = category
         
         self.dataset_filepaths = sum([cat.dataset_filepaths for cat in self.categories.values()], [])

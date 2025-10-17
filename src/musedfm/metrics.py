@@ -6,178 +6,251 @@ import numpy as np
 from typing import Dict
 
 
-def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     """
     Mean Absolute Percentage Error with robust handling of low variance cases.
     
     Args:
-        y_true: Ground truth values
-        y_pred: Predicted values
+        y_true: Ground truth values (shape: [batch_size, num_values])
+        y_pred: Predicted values (shape: [batch_size, num_values])
         
     Returns:
-        MAPE value as a percentage, capped only for low variance cases
+        MAPE values as percentages, one per batch element (shape: [batch_size])
     """
-    # Remove NaN values from both arrays
+    # Ensure inputs are float type to avoid integer overflow issues
+    y_true = np.asarray(y_true, dtype=np.float64)
+    y_pred = np.asarray(y_pred, dtype=np.float64)
+    
+    # Create mask for valid (non-NaN) values
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
-    y_true_clean = y_true[valid_mask]
-    y_pred_clean = y_pred[valid_mask]
     
-    if len(y_true_clean) == 0:
-        print(f"Warning: MAPE calculation failed - no valid data points after NaN removal")
-        return np.nan
+    # Check for batch elements with no valid data
+    valid_counts = np.sum(valid_mask, axis=1)
+    empty_batches = valid_counts == 0        
     
-    # Calculate target statistics for robust handling
-    target_mean = np.mean(y_true_clean)
-    target_std = np.std(y_true_clean)
-    target_range = np.max(y_true_clean) - np.min(y_true_clean)
+    # Calculate target statistics for robust handling (per batch element)
+    target_mean = np.nanmean(y_true, axis=1, where=valid_mask)
+    target_std = np.nanstd(y_true, axis=1, where=valid_mask)
+    target_max = np.nanmax(y_true, axis=1, where=valid_mask, initial=-np.inf)
+    target_min = np.nanmin(y_true, axis=1, where=valid_mask, initial=np.inf)
+    target_range = target_max - target_min
     
-    # Handle different cases based on target characteristics
-    if target_std < 1e-4:  # More lenient threshold for MAPE
-        # Low variance or constant target - use capped MAPE
-        if target_range < 1e-4:
-            # Constant target - use MAE relative to target magnitude
-            raw_mae = np.mean(np.abs(y_true_clean - y_pred_clean))
-            normalization_factor = max(abs(target_mean), 1e-6)
-            mape = (raw_mae / normalization_factor) * 100
-        else:
-            # Low variance - use range-based normalization
-            raw_mae = np.mean(np.abs(y_true_clean - y_pred_clean))
-            mape = (raw_mae / target_range) * 100
+    # Initialize result array
+    mape_per_batch = np.full(y_true.shape[0], np.nan)
+
+    LOW_VARIANCE_THRESHOLD = 1e-3
+    
+    # Handle low variance cases (target_std < 1e-3)
+    low_variance_mask = target_std < LOW_VARIANCE_THRESHOLD
+    low_variance_mask = low_variance_mask & ~empty_batches
+    
+    if np.any(low_variance_mask):
+        # Calculate MAE for low variance cases
+        mae_low_var = np.nanmean(np.abs(y_true - y_pred), axis=1, where=valid_mask)
+        
+        # Constant target case (target_range < 1e-4)
+        constant_mask = low_variance_mask & (target_range < LOW_VARIANCE_THRESHOLD)
+        if np.any(constant_mask):
+            normalization_factor = np.maximum(np.abs(target_mean[constant_mask]), 1e-6)
+            mape_per_batch[constant_mask] = (mae_low_var[constant_mask] / normalization_factor) * 100
+        
+        # Low variance but not constant case
+        low_var_not_constant_mask = low_variance_mask & (target_range >= LOW_VARIANCE_THRESHOLD)
+        if np.any(low_var_not_constant_mask):
+            mape_per_batch[low_var_not_constant_mask] = (mae_low_var[low_var_not_constant_mask] / target_range[low_var_not_constant_mask]) * 100
         
         # Cap MAPE at 1000% for low variance cases only
-        return min(mape, 1000.0)
-    else:
-        # Normal case - use standard MAPE calculation without capping
-        # Avoid division by zero by filtering out very small values
-        min_threshold = max(target_std * 0.01, 1e-6)  # 1% of std or minimum threshold
-        mask = np.abs(y_true_clean) > min_threshold
+        mape_per_batch[low_variance_mask] = np.minimum(mape_per_batch[low_variance_mask], 1000.0)
+    
+    # Handle normal cases (target_std >= 1e-4)
+    normal_mask = target_std >= LOW_VARIANCE_THRESHOLD
+    normal_mask = normal_mask & ~empty_batches
+    
+    if np.any(normal_mask):
+        # Calculate minimum threshold for each batch element
+        min_threshold = np.maximum(target_std[normal_mask] * 0.01, 1e-6)
         
-        if not np.any(mask):
-            # All values are too small - use MAE relative to mean
-            raw_mae = np.mean(np.abs(y_true_clean - y_pred_clean))
-            mape = (raw_mae / max(abs(target_mean), 1e-6)) * 100
-        else:
-            # Calculate MAPE for values above threshold
-            mape = np.mean(np.abs((y_true_clean[mask] - y_pred_clean[mask]) / y_true_clean[mask])) * 100
+        # Create mask for values above threshold (per batch element)
+        # Only apply threshold mask to normal_mask elements
+        threshold_mask = np.zeros_like(y_true, dtype=bool)
+        threshold_mask[normal_mask] = np.abs(y_true[normal_mask]) > min_threshold[:, np.newaxis]
+        combined_mask = valid_mask & threshold_mask & normal_mask[:, np.newaxis]
         
-        # No capping for normal cases - allow natural MAPE values
-        return mape
+        # Calculate MAPE for values above threshold
+        mape_normal = np.full(np.sum(normal_mask), np.nan)
+        for i, batch_idx in enumerate(np.where(normal_mask)[0]):
+            batch_combined_mask = combined_mask[batch_idx]
+            if np.any(batch_combined_mask):
+                mape_normal[i] = np.nanmean(np.abs((y_true[batch_idx] - y_pred[batch_idx]) / y_true[batch_idx]), where=batch_combined_mask) * 100
+        
+        # Handle cases where all values are too small
+        small_values_mask = normal_mask & ~np.any(threshold_mask & valid_mask, axis=1)
+        if np.any(small_values_mask):
+            mae_small = np.nanmean(np.abs(y_true - y_pred), axis=1, where=valid_mask)
+            normalization_factor = np.maximum(np.abs(target_mean[small_values_mask]), 1e-6)
+            mape_per_batch[small_values_mask] = (mae_small[small_values_mask] / normalization_factor) * 100
+        
+        # Set normal case MAPE values
+        normal_with_data_mask = normal_mask & ~small_values_mask
+        normal_indices = np.where(normal_with_data_mask)[0]
+        for i, batch_idx in enumerate(normal_indices):
+            mape_per_batch[batch_idx] = mape_normal[i]
+    return mape_per_batch
 
 
-def MAE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+def MAE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     """
     Mean Absolute Error.
     
     Args:
-        y_true: Ground truth values
-        y_pred: Predicted values
+        y_true: Ground truth values (shape: [batch_size, num_values])
+        y_pred: Predicted values (shape: [batch_size, num_values])
         
     Returns:
-        MAE value
+        MAE values, one per batch element (shape: [batch_size])
     """
-    # Remove NaN values from both arrays
+    # Create mask for valid (non-NaN) values
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
-    y_true_clean = y_true[valid_mask]
-    y_pred_clean = y_pred[valid_mask]
     
-    if len(y_true_clean) == 0:
-        print(f"Warning: MAE calculation failed - no valid data points after NaN removal")
-        return np.nan
+    # Calculate MAE for each batch element using vectorized operations
+    # Use nanmean to handle cases where all values in a batch element are NaN
+    mae_per_batch = np.nanmean(np.abs(y_true - y_pred), axis=1, where=valid_mask)
     
-    return np.mean(np.abs(y_true_clean - y_pred_clean))
+    # Check for batch elements with no valid data
+    valid_counts = np.sum(valid_mask, axis=1)
+    empty_batches = valid_counts == 0
+    
+    if np.any(empty_batches):
+        print(f"Warning: MAE calculation failed for {np.sum(empty_batches)} batch elements - no valid data points after NaN removal")
+        mae_per_batch[empty_batches] = np.nan
+    
+    return mae_per_batch
 
 
-def RMSE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+def RMSE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     """
     Root Mean Square Error.
     
     Args:
-        y_true: Ground truth values
-        y_pred: Predicted values
+        y_true: Ground truth values (shape: [batch_size, num_values])
+        y_pred: Predicted values (shape: [batch_size, num_values])
         
     Returns:
-        RMSE value
+        RMSE values, one per batch element (shape: [batch_size])
     """
-    # Remove NaN values from both arrays
+    # Create mask for valid (non-NaN) values
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
-    y_true_clean = y_true[valid_mask]
-    y_pred_clean = y_pred[valid_mask]
     
-    if len(y_true_clean) == 0:
-        print(f"Warning: RMSE calculation failed - no valid data points after NaN removal")
-        return np.nan
+    # Calculate RMSE for each batch element using vectorized operations
+    # Use nanmean to handle cases where all values in a batch element are NaN
+    mse_per_batch = np.nanmean((y_true - y_pred) ** 2, axis=1, where=valid_mask)
+    rmse_per_batch = np.sqrt(mse_per_batch)
     
-    return np.sqrt(np.mean((y_true_clean - y_pred_clean) ** 2))
+    # Check for batch elements with no valid data
+    valid_counts = np.sum(valid_mask, axis=1)
+    empty_batches = valid_counts == 0
+    
+    if np.any(empty_batches):
+        print(f"Warning: RMSE calculation failed for {np.sum(empty_batches)} batch elements - no valid data points after NaN removal")
+        rmse_per_batch[empty_batches] = np.nan
+    
+    return rmse_per_batch
 
 
-def NMAE(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+def NMAE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     """
     Normalized Mean Absolute Error.
     
     Args:
-        y_true: Ground truth values
-        y_pred: Predicted values
+        y_true: Ground truth values (shape: [batch_size, num_values])
+        y_pred: Predicted values (shape: [batch_size, num_values])
         
     Returns:
-        NMAE value (MAE of forecast and target after robust normalization)
+        NMAE values, one per batch element (shape: [batch_size])
     """
-    # Remove NaN values from both arrays
+    # Create mask for valid (non-NaN) values
     valid_mask = ~(np.isnan(y_true) | np.isnan(y_pred))
-    y_true_clean = y_true[valid_mask]
-    y_pred_clean = y_pred[valid_mask]
     
-    if len(y_true_clean) == 0:
-        print(f"Warning: NMAE calculation failed - no valid data points after NaN removal")
-        return np.nan
+    # Check for batch elements with no valid data
+    valid_counts = np.sum(valid_mask, axis=1)
+    empty_batches = valid_counts == 0
     
-    # Calculate mean and std of target signal
-    target_mean = np.mean(y_true_clean)
-    target_std = np.std(y_true_clean)
+    if np.any(empty_batches):
+        print(f"Warning: NMAE calculation failed for {np.sum(empty_batches)} batch elements - no valid data points after NaN removal")
     
-    # Handle low variance targets by capping NMAE at 3 standard deviations
-    if target_std < 1e-6:
-        # For low variance targets, calculate raw MAE and cap at 3 std deviations
-        raw_mae = np.mean(np.abs(y_true_clean - y_pred_clean))
+
+    LOW_VARIANCE_THRESHOLD = 1e-3
+    y_true = np.asarray(y_true, dtype=np.float64)
+    y_pred = np.asarray(y_pred, dtype=np.float64)
+    
+    # Calculate mean and std of target signal (per batch element)
+    target_mean = np.nanmean(y_true, axis=1, where=valid_mask)
+    target_std = np.nanstd(y_true, axis=1, where=valid_mask)
+    target_max = np.nanmax(y_true, axis=1, where=valid_mask, initial=-np.inf)
+    target_min = np.nanmin(y_true, axis=1, where=valid_mask, initial=np.inf)
+    target_range = target_max - target_min
+    
+    # Initialize result array
+    nmae_per_batch = np.full(y_true.shape[0], np.nan)
+    
+    # Handle low variance targets (target_std < 1e-6)
+    low_variance_mask = target_std < LOW_VARIANCE_THRESHOLD
+    low_variance_mask = low_variance_mask & ~empty_batches
+    
+    if np.any(low_variance_mask):
+        # Calculate raw MAE for low variance cases
+        raw_mae_low_var = np.nanmean(np.abs(y_true - y_pred), axis=1, where=valid_mask)
         
-        # Use target range if available, otherwise use mean magnitude
-        target_range = np.max(y_true_clean) - np.min(y_true_clean)
-        if target_range < 1e-6:
-            # Constant target - use mean magnitude for normalization
-            normalization_factor = max(abs(target_mean), 1e-6)
-        else:
-            # Low variance but not constant - use range
-            normalization_factor = target_range
+        # Constant target case (target_range < 1e-6)
+        constant_mask = low_variance_mask & (target_range < LOW_VARIANCE_THRESHOLD)
+        if np.any(constant_mask):
+            normalization_factor = np.maximum(np.abs(target_mean[constant_mask]), 1e-6)
+            nmae_per_batch[constant_mask] = raw_mae_low_var[constant_mask] / normalization_factor
         
-        # Calculate normalized MAE
-        normalized_mae = raw_mae / normalization_factor
+        # Low variance but not constant case
+        low_var_not_constant_mask = low_variance_mask & (target_range >= LOW_VARIANCE_THRESHOLD)
+        if np.any(low_var_not_constant_mask):
+            nmae_per_batch[low_var_not_constant_mask] = raw_mae_low_var[low_var_not_constant_mask] / target_range[low_var_not_constant_mask]
         
         # Cap at 3 standard deviations (3.0 in normalized space)
-        return min(normalized_mae, 3.0)
-    else:
-        # Normal case - use standard deviation normalization
-        normalization_factor = target_std
+        nmae_per_batch[low_variance_mask] = np.minimum(nmae_per_batch[low_variance_mask], 3.0)
+    
+    # Handle normal cases (target_std >= 1e-6)
+    normal_mask = target_std >= LOW_VARIANCE_THRESHOLD
+    normal_mask = normal_mask & ~empty_batches
+    
+    if np.any(normal_mask):
+        # Use standard deviation normalization
+        normalization_factor = target_std[normal_mask]
+        target_mean_normal = target_mean[normal_mask]
         
         # Normalize both forecast and target
-        y_true_normalized = (y_true_clean - target_mean) / normalization_factor
-        y_pred_normalized = (y_pred_clean - target_mean) / normalization_factor
+        y_true_normalized = (y_true[normal_mask] - target_mean_normal[:, np.newaxis]) / normalization_factor[:, np.newaxis]
+        y_pred_normalized = (y_pred[normal_mask] - target_mean_normal[:, np.newaxis]) / normalization_factor[:, np.newaxis]
         
         # Calculate MAE of normalized values
-        normalized_mae = np.mean(np.abs(y_true_normalized - y_pred_normalized))
+        normalized_mae = np.full(np.sum(normal_mask), np.nan)
+        for i, batch_idx in enumerate(np.where(normal_mask)[0]):
+            batch_valid_mask = valid_mask[batch_idx]
+            if np.any(batch_valid_mask):
+                normalized_mae[i] = np.nanmean(np.abs(y_true_normalized[i] - y_pred_normalized[i]), where=batch_valid_mask)
         
         # Cap at 3 standard deviations for consistency
-        return min(normalized_mae, 3.0)
+        nmae_per_batch[normal_mask] = np.minimum(normalized_mae, 3.0)
+    
+    return nmae_per_batch
 
 
-def evaluate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+def evaluate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, np.ndarray]:
     """
     Evaluate all metrics for given predictions.
     
     Args:
-        y_true: Ground truth values
-        y_pred: Predicted values
+        y_true: Ground truth values (shape: [batch_size, num_values])
+        y_pred: Predicted values (shape: [batch_size, num_values])
         
     Returns:
-        Dictionary containing all metric values
+        Dictionary containing metric vectors (one per batch element)
     """
     return {
         'MAPE': MAPE(y_true, y_pred),

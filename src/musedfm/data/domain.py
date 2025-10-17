@@ -16,7 +16,7 @@ class Domain:
     
     def __init__(self, domain_name: str, dataset_paths: List[Path], 
     category_names: Dict[str, Dict[str, List[str]]], domain_category_map: Dict[str, str], 
-    history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, needs_counting: bool = True):
+    history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, needs_counting: bool = True, batch_size: int = 1):
         """
         Initialize domain from directory containing multiple dataset directories.
         
@@ -29,6 +29,7 @@ class Domain:
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
             needs_counting: If True, count windows
+            batch_size: Number of windows to collect in each batch (default: 1 for single window mode)
         """
         self.domain_name = domain_name
         self.dataset_paths = dataset_paths
@@ -37,6 +38,7 @@ class Domain:
         self.category_names = category_names
         self.domain_category_map = domain_category_map
         self.stride = stride
+        self.batch_size = batch_size
         self._datasets: List[Dataset] = []
         self.needs_counting = needs_counting
         self._load_datasets()
@@ -49,7 +51,7 @@ class Domain:
                 # Check if this directory or any of its subdirectories contain parquet files
                 parquet_files = list(d.rglob("*.parquet"))
                 if parquet_files:
-                    dataset = Dataset.from_config(str(d), d.name, self.history_length, self.forecast_horizon, self.stride, needs_counting=self.needs_counting)
+                    dataset = Dataset.from_config(str(d), d.name, self.history_length, self.forecast_horizon, self.stride, needs_counting=self.needs_counting, batch_size=self.batch_size)
                     self._datasets.append(dataset)
                 else:
                     print(f"Dataset {d.name} has no parquet files")

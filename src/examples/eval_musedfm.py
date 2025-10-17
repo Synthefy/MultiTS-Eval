@@ -21,6 +21,7 @@ import numpy as np
 import argparse
 import copy
 import pandas as pd
+from tqdm import tqdm
 from musedfm.data import Benchmark
 from musedfm.plotting import plot_window_forecasts
 
@@ -32,10 +33,7 @@ from examples.model_handling import (
     parse_models
 )
 from examples.debug import (
-    _initialize_nan_tracking, _update_nan_tracking, _check_window_nan_values,
-    _report_nan_statistics, plot_high_mape_windows,
-    debug_model_performance, debug_univariate_performance, debug_forecast_failure,
-    debug_forecast_length_mismatch, debug_model_summary
+    _check_window_nan_values
 )
 from examples.export_csvs import (
     export_hierarchical_results_to_csv
@@ -131,52 +129,123 @@ def _forecast_window_with_models(window, models, model_dataset_results, model_da
     
     # Process this window with all models
     for model_name, model in models.items():
-        target_length = len(window.target())
+        target_length = window.target().shape[1]  # Get forecast horizon from batched target
         
         # Generate multivariate forecast if model supports it (do this first for proper training)
         multivariate_forecast = None
         if not model["univariate"]:
             with suppress_all_warnings():
-                multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
-            if multivariate_forecast is None:
-                multivariate_forecast = np.zeros(target_length)  # Fallback to zeros
+                multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length, window.timestamps())
+
+        # Save multivariate forecast if available
+        if multivariate_forecast is not None and save_managers_multivariate[model_name] is not None:
+            save_managers_multivariate[model_name].save_forecasts_interval(multivariate_forecast, category.category, domain.domain_name, dataset.dataset_name)
         
         # Generate univariate forecast
         with suppress_all_warnings():
-            univariate_forecast = model["model"].forecast(window.history(), None, target_length)
-        if univariate_forecast is None:
-            univariate_forecast = np.zeros(target_length)  # Fallback to zeros
+            univariate_forecast = model["model"].forecast(window.history(), None, target_length, window.timestamps())
 
+        # Save univariate forecast if available
+        if univariate_forecast is not None and save_managers_univariate[model_name] is not None:
+            save_managers_univariate[model_name].save_forecasts_interval(univariate_forecast, category.category, domain.domain_name, dataset.dataset_name)
+
+        # Validate forecast length matches target length (only if forecast is not None)
+        if univariate_forecast is not None and univariate_forecast.shape[1] != target_length:
+            raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {univariate_forecast.shape[1]} values, but target has {target_length} values")
+
+        # Submit both forecasts (only if they are not None)
+        if multivariate_forecast is not None or univariate_forecast is not None:
+            window.submit_forecast(multivariate_forecast, univariate_forecast)
+        
         # Get evaluation results for multivariate forecast if submitted
         if multivariate_forecast is not None:
-            save_managers_multivariate[model_name].save_forecasts_interval(multivariate_forecast, category.category, domain.domain_name, dataset.dataset_name)
+            multivariate_results = window.evaluate("multivariate")
+            model_dataset_results[model_name].append(multivariate_results)
         
         # Store univariate results
         if univariate_forecast is not None:
+            univariate_results = window.evaluate("univariate")
             # For univariate models, store in main results; for multivariate models, store in _univariate
-            save_managers_univariate[model_name].save_forecasts_interval(univariate_forecast, category.category, domain.domain_name, dataset.dataset_name)
+            if model["univariate"]:
+                model_dataset_results[model_name].append(univariate_results)
+            else:
+                model_dataset_results[f"{model_name}_univariate"].append(univariate_results)
 
-        model_dataset_windows[model_name] += 1
-        results[model_name]['windows'] += 1
-        
-        # Also count windows for univariate results if available
-        if not model["univariate"] and univariate_forecast is not None:
-            univariate_model_name = f"{model_name}_univariate"
-            results[univariate_model_name]['windows'] += 1
+        # Only count windows where at least one forecast was generated
+        if multivariate_forecast is not None or univariate_forecast is not None:
+            model_dataset_windows[model_name] += window.batch_size
+            results[model_name]['windows'] += window.batch_size
+            
+            # Also count windows for univariate results if available
+            if not model["univariate"] and univariate_forecast is not None:
+                univariate_model_name = f"{model_name}_univariate"
+                results[univariate_model_name]['windows'] += window.batch_size
     
     return window_nan_stats
+
+
+def _calculate_dataset_metrics(model_dataset_results, model_name):
+    """Calculate average metrics for a model on a dataset."""
+    if model_dataset_results[model_name]:
+        dataset_avg_metrics = {}
+        
+        # Get metric names from the first result
+        metric_names = list(model_dataset_results[model_name][0].keys())
+        
+        # Collect all metric vectors from all batches
+        all_metric_values = {metric: [] for metric in metric_names}
+        
+        for result in model_dataset_results[model_name]:
+            # Each result now contains metric vectors instead of scalars
+            for metric in metric_names:
+                all_metric_values[metric].extend(result[metric])
+        
+        # Calculate single nanmean across all individual window metrics
+        for metric in metric_names:
+            dataset_avg_metrics[metric] = np.nanmean(all_metric_values[metric]) if all_metric_values[metric] else np.nan
+    else:
+        # No valid results - set all metrics to NaN
+        dataset_avg_metrics = {'MAPE': np.nan, 'MAE': np.nan, 'RMSE': np.nan, 'NMAE': np.nan}
+    
+    return dataset_avg_metrics
+
+
+def _process_univariate_results(model_name, model, model_dataset_results, model_dataset_windows, 
+                               model_elapsed_time, dataset_name, results):
+    """Process univariate results for multivariate models."""
+    if not model["univariate"] and f"{model_name}_univariate" in model_dataset_results:
+        univariate_model_name = f"{model_name}_univariate"
+        
+        # Calculate average metrics for univariate version
+        univariate_avg_metrics = _calculate_dataset_metrics(model_dataset_results, univariate_model_name)
+        
+        # Store univariate dataset results
+        results[univariate_model_name]['dataset_results'].append({
+            'dataset_name': dataset_name,
+            'metrics': univariate_avg_metrics,
+            'window_count': model_dataset_windows[model_name]  # Same window count as main model
+        })
+        
+        # Use same elapsed time as main model
+        results[univariate_model_name]['time'] += model_elapsed_time
+        
+        return univariate_model_name, univariate_avg_metrics
+    
+    return None, None
+
 
 def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int = 100, 
                            categories: str = None, domains: str = None, datasets: str = None,
                            collect_plot_data: bool = False, history_length: int = 512, 
                            forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False,
-                           num_plots_to_keep: int = 1, debug_mode: bool = False, chunk_size: int = 65536, forecast_save_path: str = "./"):
+                           num_plots_to_keep: int = 1, chunk_size: int = 65536, 
+                           forecast_save_path: str = "./", batch_size: int = 1):
     """Run multiple forecasting models on a benchmark and compare their performance."""
     print("=" * 60)
     print("Running Multiple Models on Benchmark")
     print("=" * 60)
     
-    benchmark = Benchmark(benchmark_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached_counts)
+    benchmark = Benchmark(benchmark_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached_counts, batch_size=batch_size)
     print(f"Loaded benchmark with {len(benchmark)} categories")
     print(f"Running {len(models)} models: {list(models.keys())}")
     
@@ -218,6 +287,21 @@ def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows:
     skip_datasets_debug = 0  # DEBUG: Change this to skip the first N datasets for debugging
     last_dataset_debug = -1
     
+    # Calculate total datasets for progress tracking
+    total_datasets = 0
+    for category in benchmark:
+        if categories is not None and category.category_path.name not in categories:
+            continue
+        for domain in category:
+            if domains is not None and domain.domain_path.name not in domains:
+                continue
+            for dataset in domain:
+                if datasets is not None and dataset.data_path.name not in datasets:
+                    continue
+                total_datasets += 1
+    
+    dataset_progress = tqdm(total=total_datasets, desc="Processing datasets", unit="dataset")
+    
     for category in benchmark:
         # Apply filters if specified
         if categories is not None and category.category_path.name not in categories:
@@ -236,7 +320,7 @@ def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows:
                     continue
                 
                 # Get full dataset name from benchmark path
-                dataset_name = str(dataset.data_path.relative_to(benchmark.benchmark_path))
+                dataset_name = str(dataset.dataset_name)
                 print(f"\nProcessing dataset {dataset_count + 1}: {dataset_name}")
                 dataset_count += 1
                 
@@ -252,25 +336,81 @@ def forecast_models_on_benchmark(benchmark_path: str, models: dict, max_windows:
                         model_dataset_results[f"{model_name}_univariate"] = []
                 model_start_times = {model_name: time.time() for model_name in models.keys()}
                 
-                # Initialize NaN tracking for this dataset
-                nan_stats = _initialize_nan_tracking()
+                # Determine number of windows to process
+                num_windows_estimate = min(len(dataset), max_windows) if max_windows is not None else len(dataset)
+                num_iters_estimate = int(np.ceil(num_windows_estimate / batch_size))
+                window_progress = tqdm(total=num_iters_estimate, desc=f"Windows in {dataset_name}", unit="iters", leave=False)
                 
                 for i, window in enumerate(dataset):
                     # Check max_windows per dataset, not overall
-                    if max_windows is not None and i >= max_windows:
+                    if max_windows is not None and i >= num_iters_estimate:
                         break
                     
                     # Process this window with all models
-                    window_nan_stats = _forecast_window_with_models(
+                    _forecast_window_with_models(
                         window, models, model_dataset_results, model_dataset_windows, 
                         results, model_save_managers_multivariate, model_save_managers_univariate, category, domain, dataset
                     )
+                    
+                    window_progress.update(1)
+                
                 for model_name, save_manager in model_save_managers_multivariate.items():
                     if save_manager is not None:
                         save_manager.flush_saving()
                 for model_name, save_manager in model_save_managers_univariate.items():
                     if save_manager is not None:
                         save_manager.flush_saving()
+                
+                # Calculate average metrics and store results for each model
+                for model_name in models.keys():
+                    # Calculate average metrics for this model on this dataset
+                    dataset_avg_metrics = _calculate_dataset_metrics(model_dataset_results, model_name)
+                    
+                    # Store dataset results for this model
+                    results[model_name]['dataset_results'].append({
+                        'dataset_name': dataset_name,
+                        'metrics': dataset_avg_metrics,
+                        'window_count': model_dataset_windows[model_name]
+                    })
+                    
+                    model_elapsed_time = time.time() - model_start_times[model_name]
+                    results[model_name]['time'] += model_elapsed_time
+                
+                # Process univariate results for multivariate models only
+                for model_name, model in models.items():
+                    univariate_model_name, univariate_avg_metrics = _process_univariate_results(
+                        model_name, model, model_dataset_results, model_dataset_windows, 
+                        model_elapsed_time, dataset_name, results
+                    )
+                
+                # Update dataset progress
+                dataset_progress.update(1)
+        
+        # Aggregate domain-level metrics for this domain
+        _aggregate_results_by_level(results, models, benchmark, domain.domain_name, 'domain')
+    
+    # Aggregate category-level metrics for each category
+    for category in benchmark:
+        _aggregate_results_by_level(results, models, benchmark, category.category, 'category')
+        
+    # Calculate overall average metrics across all datasets for each model
+    all_model_names = list(models.keys())
+    # Add univariate model names for multivariate models only
+    for model_name, model in models.items():
+        if not model["univariate"]:
+            all_model_names.append(f"{model_name}_univariate")
+    
+    for model_name in all_model_names:
+        if results[model_name]['dataset_results']:
+            overall_avg_metrics, _, _ = _aggregate_metrics(results[model_name]['dataset_results'])
+        else:
+            overall_avg_metrics = {}
+        
+        results[model_name]['metrics'] = overall_avg_metrics
+    
+    if collect_plot_data:
+        results['_plot_data'] = plot_data
+    
     return results
 
 def main():
@@ -375,6 +515,13 @@ Examples:
         help="Chunk size for saving forecasts (default: 1048576)"
     )
     
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Batch size for processing windows (default: 1)"
+    )
+    
     args = parser.parse_args()
     
     print("MUSED-FM Example: Multiple Model Forecasting")
@@ -405,7 +552,7 @@ Examples:
                                      categories=categories, domains=domains, datasets=datasets,
                                      history_length=args.history_length,
                                      forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts,
-                                     chunk_size=args.chunk_size, forecast_save_path=args.forecast_save_path)
+                                     chunk_size=args.chunk_size, forecast_save_path=args.forecast_save_path, batch_size=args.batch_size)
 
     # Save submission files
     submission_dir = os.path.join(args.output_dir, "submissions")

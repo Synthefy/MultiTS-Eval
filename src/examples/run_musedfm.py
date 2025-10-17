@@ -40,8 +40,11 @@ from examples.model_handling import (
 from examples.debug import (
     _initialize_nan_tracking, _update_nan_tracking, _check_window_nan_values,
     _report_nan_statistics, plot_high_mape_windows,
-    debug_model_performance, debug_univariate_performance, debug_forecast_failure,
-    debug_forecast_length_mismatch, debug_model_summary
+    debug_model_performance, debug_univariate_performance,
+    debug_model_summary,
+    debug_low_variance_window, debug_low_variance_summary,
+    plot_low_variance_dataset_summary, print_final_low_variance_statistics,
+    create_individual_window
 )
 from examples.export_csvs import (
     export_hierarchical_results_to_csv
@@ -120,36 +123,30 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
     
     # Process this window with all models
     for model_name, model in models.items():
-        target_length = len(window.target())
+        
+        target_length = window.target().shape[1]  # Get forecast horizon from batched target
         
         # Generate multivariate forecast if model supports it (do this first for proper training)
         multivariate_forecast = None
         if not model["univariate"]:
             with suppress_all_warnings():
-                multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length)
+                multivariate_forecast = model["model"].forecast(window.history(), window.covariates(), target_length, window.timestamps())
 
-            # debugging failed forecasts
-            if multivariate_forecast is None:
-                debug_forecast_failure(model_name, "multivariate")
-                multivariate_forecast = np.zeros(target_length)  # Fallback to zeros
-            if save_managers_multivariate[model_name] is not None:
-                save_managers_multivariate[model_name].save_forecasts_interval(multivariate_forecast, category.category, domain.domain_name, dataset_name)
+        # debugging failed forecasts
+        if save_managers_multivariate[model_name] is not None:
+            save_managers_multivariate[model_name].save_forecasts_interval(multivariate_forecast, category.category, domain.domain_name, dataset_name)
         
         # Generate univariate forecast
         with suppress_all_warnings():
-            univariate_forecast = model["model"].forecast(window.history(), None, target_length)
+            univariate_forecast = model["model"].forecast(window.history(), None, target_length, window.timestamps())
 
         # debugging failed forecasts
-        if univariate_forecast is None:
-            debug_forecast_failure(model_name, "univariate")
-            univariate_forecast = np.zeros(target_length)  # Fallback to zeros
         if save_managers_univariate[model_name] is not None:
             save_managers_univariate[model_name].save_forecasts_interval(univariate_forecast, category.category, domain.domain_name, dataset_name)
 
         # Validate forecast length matches target length
-        if len(univariate_forecast) != target_length:
-            debug_forecast_length_mismatch(model_name, len(univariate_forecast), target_length)
-            raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {len(univariate_forecast)} values, but target has {target_length} values")
+        if univariate_forecast.shape[1] != target_length:
+            raise ValueError(f"Forecast length mismatch: model '{model_name}' returned {univariate_forecast.shape[1]} values, but target has {target_length} values")
 
         # Submit both forecasts
         window.submit_forecast(multivariate_forecast, univariate_forecast)
@@ -179,13 +176,18 @@ def _process_window_with_models(window, models, model_dataset_results, model_dat
                 'dataset_name': dataset_name
             })
         
-        model_dataset_windows[model_name] += 1
-        results[model_name]['windows'] += 1
+        model_dataset_windows[model_name] += window.batch_size
+        results[model_name]['windows'] += window.batch_size
         
         # Also count windows for univariate results if available
         if not model["univariate"] and univariate_forecast is not None:
             univariate_model_name = f"{model_name}_univariate"
-            results[univariate_model_name]['windows'] += 1
+            results[univariate_model_name]['windows'] += window.batch_size
+        
+        # # Restore stdout if it was disabled
+        # if model_name != "chronos":
+        #     sys.stdout.close()
+        #     sys.stdout = sys.__stdout__
     
     return window_nan_stats
 
@@ -194,13 +196,21 @@ def _calculate_dataset_metrics(model_dataset_results, model_name):
     """Calculate average metrics for a model on a dataset."""
     if model_dataset_results[model_name]:
         dataset_avg_metrics = {}
-        for metric in model_dataset_results[model_name][0].keys():
-            values = [result[metric] for result in model_dataset_results[model_name]]
-            # Check if values list is not empty before calling nanmean
-            if values:
-                dataset_avg_metrics[metric] = np.nanmean(values)
-            else:
-                dataset_avg_metrics[metric] = np.nan
+        
+        # Get metric names from the first result
+        metric_names = list(model_dataset_results[model_name][0].keys())
+        
+        # Collect all metric vectors from all batches
+        all_metric_values = {metric: [] for metric in metric_names}
+        
+        for result in model_dataset_results[model_name]:
+            # Each result now contains metric vectors instead of scalars
+            for metric in metric_names:
+                all_metric_values[metric].extend(result[metric])
+        
+        # Calculate single nanmean across all individual window metrics
+        for metric in metric_names:
+            dataset_avg_metrics[metric] = np.nanmean(all_metric_values[metric]) if all_metric_values[metric] else np.nan
     else:
         # No valid results - set all metrics to NaN
         dataset_avg_metrics = {'MAPE': np.nan, 'MAE': np.nan, 'RMSE': np.nan, 'NMAE': np.nan}
@@ -237,18 +247,25 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                            categories: str = None, domains: str = None, datasets: str = None,
                            collect_plot_data: bool = False, history_length: int = 512, 
                            forecast_horizon: int = 128, stride: int = 256, load_cached_counts: bool = False,
-                           num_plots_to_keep: int = 1, debug_mode: bool = False, chunk_size: int = 1048576, forecast_save_path: str = "", output_dir: str = ""):
+                           num_plots_to_keep: int = 1, debug_mode: bool = False, chunk_size: int = 1048576, forecast_save_path: str = "", output_dir: str = "", batch_size: int = 1):
     """Run multiple forecasting models on a benchmark and compare their performance."""
     print("=" * 60)
     print("Running Multiple Models on Benchmark")
     print("=" * 60)
     
-    benchmark = Benchmark(benchmark_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached_counts)
+    benchmark = Benchmark(benchmark_path, history_length=history_length, forecast_horizon=forecast_horizon, stride=stride, load_cached_counts=load_cached_counts, batch_size=batch_size)
     print(f"Loaded benchmark with {len(benchmark)} categories")
     print(f"Running {len(models)} models: {list(models.keys())}")
     
     results = {}
     plot_data = []  # Store windows and forecasts for plotting
+    
+    # Initialize global statistics collection
+    all_dataset_low_variance_stats = {}
+    total_windows_processed = 0
+    total_files_processed = 0
+    dataset_seen_files = {}  # Track unique files seen during processing
+    low_variance_windows = {}
     
     # Initialize results for each model
     results_base_dict = {
@@ -332,6 +349,7 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 
                 # Get full dataset name from benchmark path
                 dataset_name = str(dataset.dataset_name)
+                dataset_seen_files[dataset_name] = set()
                 dataset_progress.set_postfix_str(f"Processing: {dataset_name}")
                 dataset_count += 1
                 
@@ -347,19 +365,72 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                         model_dataset_results[f"{model_name}_univariate"] = []
                 model_start_times = {model_name: time.time() for model_name in models.keys()}
                 
+                # Initialize low variance tracking for debugging
+                low_variance_windows[dataset_name] = list()
+                
                 # Initialize NaN tracking for this dataset
                 nan_stats = _initialize_nan_tracking()
                 
                 # Determine number of windows to process
-                num_windows = min(len(dataset), max_windows) if max_windows is not None else len(dataset)
-                window_progress = tqdm(total=num_windows, desc=f"Windows in {dataset_name}", unit="window", leave=False)
+                num_windows_estimate = min(len(dataset), max_windows) if max_windows is not None else len(dataset)
+                num_iters_estimate = int(np.ceil(num_windows_estimate / batch_size))
+                window_progress = tqdm(total=num_iters_estimate, desc=f"Windows in {dataset_name}", unit="iters", leave=False)
+                num_windows = 0
+                last_parquet_index = 0
                 
                 for i, window in enumerate(dataset):
                     # Check max_windows per dataset, not overall
-                    if max_windows is not None and i >= max_windows:
+                    if num_iters_estimate is not None and i >= num_iters_estimate:
                         break
                     
                     window_progress.set_postfix_str(f"Window {i+1}/{len(dataset)}")
+                    
+                    # Track files as we see them
+                    added_files = list()
+                    if hasattr(dataset, '_parquet_files') and hasattr(dataset, '_current_parquet_index'):
+                        for j in range(last_parquet_index, min(dataset._current_parquet_index, len(dataset._parquet_files))):
+                            current_file = str(dataset._parquet_files[j])
+                            added_files.append(current_file)
+                            dataset_seen_files[dataset_name].add(current_file)
+                        last_parquet_index = min(dataset._current_parquet_index, len(dataset._parquet_files))
+                        # last_parquet_index = dataset._current_parquet_index
+                        # current_file = str(dataset._parquet_files[dataset._current_parquet_index])
+                        # dataset_seen_files[dataset_name].add(current_file)
+                    else:
+                        raise ValueError(f"Dataset {dataset_name} has no parquet files")
+                    
+                    # Debug low variance targets if in debug mode
+                    if debug_mode:
+                        target = window.target()  # Get target once for all models
+                        batch_size = target.shape[0]
+                        
+                        # Check each individual window in the batch separately
+                        for batch_idx in range(batch_size):
+                            # Create individual window for this batch item
+                            individual_window = create_individual_window(window, batch_idx)
+                            
+                            # Call debug function for this individual window
+                            is_low_variance = debug_low_variance_window(
+                                individual_window, model_name, dataset_name, f"{i}_{batch_idx}", 
+                                save_path=output_dir, dataset=dataset
+                            )
+                            
+                            if is_low_variance:
+                                individual_target = target[batch_idx]
+                                low_variance_windows[dataset_name].append({
+                                    'dataset_name': dataset_name,
+                                    'window_idx': i * batch_size + batch_idx,
+                                    'batch_idx': batch_idx,
+                                    'iter_idx': i,
+                                    'file_path': current_file,
+                                    'model_name': model_name,
+                                    'target_std': np.std(individual_target),
+                                    'target_range': np.max(individual_target) - np.min(individual_target),
+                                    'target_mean': np.mean(individual_target),
+                                    'is_constant': (np.max(individual_target) - np.min(individual_target)) < 1e-6,
+                                    'is_near_zero': abs(np.mean(individual_target)) < 1e-3,
+                                    'file_name': os.path.basename(current_file), # when batching, this is just the best guess
+                                })
                     
                     # Process this window with all models
                     window_nan_stats = _process_window_with_models(
@@ -368,10 +439,11 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                         save_managers_multivariate=model_save_managers_multivariate, save_managers_univariate=model_save_managers_univariate,
                         category=category, domain=domain
                     )
-                    if debug_mode: 
+                    if debug_mode:
                         _update_nan_tracking(nan_stats, window_nan_stats)
                     
                     window_progress.update(1)
+                    num_windows += 1
                 
                 for model_name, save_manager in model_save_managers_multivariate.items():
                     if save_manager is not None:
@@ -412,6 +484,52 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
                 # Report NaN statistics for this dataset
                 if debug_mode:
                     _report_nan_statistics(nan_stats)
+                    # Convert dataset-keyed structure to model-keyed structure for summary
+                    model_low_variance_windows = {}
+                    for dataset_name, windows in low_variance_windows.items():
+                        for window_info in windows:
+                            model_name = window_info.get('model_name', 'unknown')
+                            if model_name not in model_low_variance_windows:
+                                model_low_variance_windows[model_name] = []
+                            model_low_variance_windows[model_name].append(window_info)
+                    debug_low_variance_summary(model_low_variance_windows)
+                    
+                    # Create dataset summary plots only once per dataset (not per model)
+                    all_low_variance_windows = []
+                    for windows in low_variance_windows[dataset_name]:
+                        all_low_variance_windows.append(windows)
+                                        
+                    if all_low_variance_windows:
+                        # Generate summary plot only once for the dataset
+                        print(f"  📊 Generating dataset summary plot...")
+                        plot_low_variance_dataset_summary(dataset_name, all_low_variance_windows, output_dir)
+                        
+                        # Simple summary instead of complex plotting
+                        unique_files = set(w['file_path'] for w in all_low_variance_windows)
+                        low_variance_dir = os.path.join(output_dir, "low_variance", dataset_name)
+                        print(f"  📊 Found {len(all_low_variance_windows)} low variance windows across {len(unique_files)} files")
+                        print(f"  📊 Files: {', '.join(os.path.basename(f) for f in unique_files)}")
+                        print(f"  📊 Low variance plots saved to: {low_variance_dir}")
+                        print(f"  📊 Low variance analysis completed for {dataset_name}")
+                        
+                        # Collect statistics for final summary
+                        unique_files = set(w['file_path'] for w in all_low_variance_windows)
+                        constant_windows = sum(1 for w in all_low_variance_windows if w.get('is_constant', False))
+                        near_zero_windows = sum(1 for w in all_low_variance_windows if w.get('is_near_zero', False))
+                        
+                        all_dataset_low_variance_stats[dataset_name] = {
+                            'total_low_variance_windows': len(all_low_variance_windows),
+                            'total_low_variance_files': len(unique_files),
+                            'constant_low_variance_windows': constant_windows,
+                            'near_zero_low_variance_windows': near_zero_windows,
+                            'low_variance_files': sorted([os.path.basename(f) for f in unique_files]),
+                            'total_windows': num_windows,
+                            'total_files': len(dataset_seen_files[dataset_name])
+                        }
+                
+                # Update global totals
+                total_windows_processed += num_windows
+                total_files_processed += len(dataset_seen_files[dataset_name])  # Count unique files seen so far
                 
                 # Close window progress bar and update dataset progress
                 window_progress.close()
@@ -447,6 +565,10 @@ def run_models_on_benchmark(benchmark_path: str, models: dict, max_windows: int 
     
     if collect_plot_data:
         results['_plot_data'] = plot_data
+    
+    # Print final low variance statistics summary
+    if debug_mode and all_dataset_low_variance_stats:
+        print_final_low_variance_statistics(all_dataset_low_variance_stats, total_windows_processed, total_files_processed, dataset_seen_files)
     
     return results
 
@@ -565,9 +687,9 @@ def main():
 Examples:
   python run_musedfm.py --models mean,arima --benchmark-path /path/to/benchmark
   python run_musedfm.py --models all --windows 50 --plots --csv
-  python run_musedfm.py --models linear_trend,exponential_smoothing --windows 20
-  python run_musedfm.py --models all --categories Traditional --domains Energy
-  python run_musedfm.py --models mean --datasets al_daily,bitcoin_price --plots
+  python run_musedfm.py --models linear_trend,exponential_smoothing --windows 20 --batch-size 4
+  python run_musedfm.py --models all --categories Traditional --domains Energy --batch-size 8
+  python run_musedfm.py --models mean --datasets al_daily,bitcoin_price --plots --batch-size 2
         """
     )
     
@@ -649,6 +771,13 @@ Examples:
         action="store_true",
         help="Load window counts from cached JSON files instead of generating"
     )
+    
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Number of windows to collect in each batch (default: 1)"
+    )
 
     parser.add_argument(
         "--debug-mode",
@@ -680,6 +809,7 @@ Examples:
     print(f"Domains: {args.domains or 'All'}")
     print(f"Datasets: {args.datasets or 'All'}")
     print(f"Max windows per dataset: {args.windows}")
+    print(f"Batch size: {args.batch_size}")
     print(f"Generate plots: {args.plots}")
     print(f"Output directory: {args.output_dir}")
     
@@ -702,7 +832,7 @@ Examples:
                                      collect_plot_data=args.plots, history_length=args.history_length,
                                      forecast_horizon=args.forecast_horizon, stride=args.stride, load_cached_counts=args.load_cached_counts,
                                      debug_mode=args.debug_mode, 
-                                     chunk_size=args.chunk_size, forecast_save_path=args.forecast_save_path, output_dir=args.output_dir)
+                                     chunk_size=args.chunk_size, forecast_save_path=args.forecast_save_path, output_dir=args.output_dir, batch_size=args.batch_size)
     
     # Compare performance
     compare_model_performance(results)

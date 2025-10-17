@@ -17,7 +17,7 @@ class Category:
     Aggregates results across domains.
     """
     
-    def __init__(self, category_path: str, base_path: str, dataset_domain_map: Dict[str, str], dataset_category_map: Dict[str, str], category_names: Dict[str, Dict[str, List[str]]], domain_category_map: Dict[str, str], history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False):
+    def __init__(self, category_path: str, base_path: str, dataset_domain_map: Dict[str, str], dataset_category_map: Dict[str, str], category_names: Dict[str, Dict[str, List[str]]], domain_category_map: Dict[str, str], history_length: int = 30, forecast_horizon: int = 1, stride: int = 1, load_cached_counts: bool = False, batch_size: int = 1):
         """
         Initialize category from directory containing multiple domain directories.
         
@@ -31,6 +31,7 @@ class Category:
             forecast_horizon: Number of future points to forecast
             stride: Step size between windows
             load_cached_counts: If True, load window counts from cached JSON files instead of generating
+            batch_size: Number of windows to collect in each batch (default: 1 for single window mode)
         """
 
         self.category_path = Path(category_path)
@@ -38,6 +39,7 @@ class Category:
         self.history_length = history_length
         self.forecast_horizon = forecast_horizon
         self.stride = stride
+        self.batch_size = batch_size
         self.dataset_domain_map = dataset_domain_map
         self.dataset_category_map = dataset_category_map
         self.domain_category_map = domain_category_map
@@ -73,7 +75,7 @@ class Category:
             
         # load the domains and check if there are any missing domains or datasets
         for domain in self.per_domain_paths:
-            domain = Domain(domain, self.per_domain_paths[domain], self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, needs_counting=needs_counting)
+            domain = Domain(domain, self.per_domain_paths[domain], self.category_names, self.domain_category_map, self.history_length, self.forecast_horizon, self.stride, needs_counting=needs_counting, batch_size=self.batch_size)
             self._domains.append(domain)
         
         for domain in self.category_names[self.category]:

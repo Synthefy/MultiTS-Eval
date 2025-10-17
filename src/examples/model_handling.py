@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-def get_available_models(device: str = "cuda:0"):
+def get_available_models(device: str = "cuda:0", use_additional_models: bool = False):
     """Get dictionary of available forecasting models.
     
     To add your own custom model:
@@ -38,25 +38,40 @@ def get_available_models(device: str = "cuda:0"):
     from musedfm.baselines.linear_regression import LinearRegressionForecast
     from musedfm.baselines.chronos_forecast import ChronosForecast
     
-    return {
+    models = {
         "mean": {"model": MeanForecast(), "univariate": True},
         "historical_inertia": {"model": HistoricalInertia(), "univariate": True},
         "linear_trend": {"model": LinearTrend(), "univariate": True},
         "exponential_smoothing": {"model": ExponentialSmoothing(), "univariate": True},
         "arima": {"model": ARIMAForecast(order=(1, 1, 1)), "univariate": True},
         "linear_regression": {"model": LinearRegressionForecast(), "univariate": False},
-        "chronos": {"model": ChronosForecast(device=device), "univariate": False}
+        "chronos": {"model": ChronosForecast(device=device), "univariate": True},
         # Add your custom models here:
         # "my_custom": {"model": MyCustomModel(), "univariate": False},
         # "another_model": {"model": AnotherModel(param1=value1, param2=value2), "univariate": True}
     }
+    if use_additional_models:
+        from musedfm.baselines.timesfm_forecast import TimesFMForecast
+        from musedfm.baselines.moirai_forecast import MoiraiForecast
+        from musedfm.baselines.toto_forecast import TotoForecast
+        models.update({
+            "timesfm": {"model": TimesFMForecast(device=device), "univariate": False},
+            "moirai": {"model": MoiraiForecast(device=device), "univariate": True},
+            "toto": {"model": TotoForecast(), "univariate": False}
+        })
+    
+    return models
 
 
 def parse_models(model_string: str, device: str = "cuda:0") -> Dict[str, Any]:
     """Parse model string and return list of model instances."""
-    available_models = get_available_models(device=device)
+    if model_string.lower() in ["moirai", "timesfm", "toto", "all_additional"]:
+        use_additional_models = True
+    else:
+        use_additional_models = False
+    available_models = get_available_models(device=device, use_additional_models=use_additional_models)
     
-    if model_string.lower() == "all":
+    if model_string.lower() == "all" or model_string.lower() == "all_additional":
         return available_models
     
     model_names = [name.strip().lower() for name in model_string.split(",")]

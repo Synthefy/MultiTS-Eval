@@ -32,7 +32,7 @@ class ChronosForecast:
         try:
             from chronos import BaseChronosPipeline, ForecastType
             
-            self.pipeline = BaseChronosPipeline.from_pretrained(
+            self.pipeline: BaseChronosPipeline = BaseChronosPipeline.from_pretrained(
                 self.model_path,
                 device_map=self.device,
             )
@@ -42,61 +42,35 @@ class ChronosForecast:
         except Exception as e:
             raise RuntimeError(f"Failed to load Chronos model: {e}")
     
-    def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, forecast_horizon: Optional[int] = None) -> np.ndarray:
+    def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, forecast_horizon: Optional[int] = None, timestamps: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Generate forecast from historical data using Chronos.
         
         Args:
-            history: Historical time series data
+            history: Historical time series data (shape: [batch_size, history_length])
             covariates: Optional covariate data (ignored for Chronos)
             forecast_horizon: Number of future points to forecast (default: 1)
+            timestamps: Optional timestamp data (ignored for Chronos)
             
         Returns:
-            Forecast values
+            Forecast values (shape: [batch_size, forecast_horizon])
         """
         if forecast_horizon is None:
             forecast_horizon = 1
         
-        # normalize using history prior to forecasting
-        history_mean = np.mean(history)
-        history_std = np.std(history)
-        history = (history - history_mean) / max(history_std, 1e-10)
+        # Vectorized normalization across the batch
+        history_mean = np.nanmean(history, axis=1, keepdims=True)  # [batch_size, 1]
+        history_std = np.nanstd(history, axis=1, keepdims=True)    # [batch_size, 1]
+        history_normalized = (history - history_mean) / np.maximum(history_std, 1e-10)
         
-        # Convert history to torch tensor
-        if isinstance(history, np.ndarray):
-            history_tensor = torch.tensor(history, dtype=torch.float32)
-        else:
-            history_tensor = torch.tensor(np.array(history), dtype=torch.float32)
+        # Convert to torch tensor and handle NaNs
+        history_tensor = torch.tensor(history_normalized, dtype=torch.float32)
+        history_tensor = torch.nan_to_num(history_tensor, nan=0.0)
         
-        # Remove NaN values
-        history_clean = history_tensor[~torch.isnan(history_tensor)]
-        
-        if len(history_clean) == 0:
-            # If no valid data, return zeros
-            return np.zeros(forecast_horizon)
-        
-        # Ensure we have enough history for forecasting
-        if len(history_clean) < 2:
-            # If insufficient data, return the last value repeated
-            last_value = float(history_clean[-1]) if len(history_clean) > 0 else 0.0
-            return np.full(forecast_horizon, last_value)
-        
-        # Generate forecast using Chronos
-        # Use predict method instead of predict_quantiles
-        context = [history_clean]                                                                                       
-        
-        # Determine prediction kwargs based on forecast type
-        predict_kwargs = {}
-        if hasattr(self.pipeline, 'forecast_type'):
-            from chronos import ForecastType
-            if self.pipeline.forecast_type == ForecastType.SAMPLES:
-                predict_kwargs = {"num_samples": self.num_samples}
-        
-        # Generate forecast
+        # Generate forecast (Chronos accepts 2D tensor directly)
         forecast_output = self.pipeline.predict(
-            context,
-            prediction_length=forecast_horizon,
-            **predict_kwargs
+            history_tensor,
+            prediction_length=forecast_horizon
         )
         
         # Convert to numpy array
@@ -105,35 +79,22 @@ class ChronosForecast:
         else:
             forecast_np = np.array(forecast_output)
         
-        # Handle different output shapes
-        if forecast_np.ndim > 1:
-            # Chronos Bolt returns (batch_size, num_quantiles, prediction_length)
-            # We want the median (0.5 quantile) which is typically at index 4 (0.1, 0.2, ..., 0.9)
-            if forecast_np.ndim == 3 and forecast_np.shape[1] == 9:  # Standard Chronos Bolt quantiles
-                # Take the median (0.5 quantile) at index 4
-                forecast_np = forecast_np[0, 4, :]  # (batch_size=1, quantile=4, prediction_length)
-            elif forecast_np.shape[0] > 1:
-                # If we have multiple samples, take the mean
-                forecast_np = np.mean(forecast_np, axis=0)
-            else:
-                forecast_np = forecast_np[0]
+        # Handle quantile output - take median (index 4 for 9 quantiles)
+        if forecast_np.ndim == 3 and forecast_np.shape[1] == 9:
+            forecast_np = forecast_np[:, 4, :]  # [batch_size, prediction_length]
         
-        # Ensure we have the right length
-        if len(forecast_np) != forecast_horizon:
-            if len(forecast_np) > forecast_horizon:
-                forecast_np = forecast_np[:forecast_horizon]
+        # Ensure correct length
+        if forecast_np.shape[1] != forecast_horizon:
+            if forecast_np.shape[1] > forecast_horizon:
+                forecast_np = forecast_np[:, :forecast_horizon]
             else:
-                # Pad with the last value if needed - use concatenation to avoid broadcasting issues
-                if len(forecast_np) > 0:
-                    last_val = float(forecast_np[-1])
-                    padding_length = forecast_horizon - len(forecast_np)
-                    padding = np.full(padding_length, last_val)
-                    forecast_np = np.concatenate([forecast_np, padding])
-                else:
-                    # If no valid forecast, fill with zeros
-                    forecast_np = np.zeros(forecast_horizon)
+                # Pad with last value
+                last_values = forecast_np[:, -1:]  # [batch_size, 1]
+                padding_length = forecast_horizon - forecast_np.shape[1]
+                padding = np.repeat(last_values, padding_length, axis=1)
+                forecast_np = np.concatenate([forecast_np, padding], axis=1)
         
-        # denormalize using history prior to forecasting
+        # Denormalize
         forecast_np = forecast_np * history_std + history_mean
         
         return forecast_np

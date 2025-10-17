@@ -31,6 +31,12 @@ def plot_window_forecasts(
     history = window.history()
     target = window.target()
     
+    # Handle batched data by taking first sample
+    if history.ndim == 2:
+        history = history[0]  # Take first sample from batch
+    if target.ndim == 2:
+        target = target[0]  # Take first sample from batch
+    
     # Create figure
     plt.figure(figsize=figsize)
     
@@ -49,6 +55,10 @@ def plot_window_forecasts(
         if forecast is None:
             print(f"Warning: Skipping {baseline_name} forecast (None)")
             continue
+        
+        # Handle batched forecast data by taking first sample
+        if forecast.ndim == 2:
+            forecast = forecast[0]  # Take first sample from batch
             
         color = colors[i % len(colors)]
         forecast_indices = np.arange(len(history), len(history) + len(forecast))
@@ -124,6 +134,12 @@ def plot_multiple_windows(
         history = window.history()
         target = window.target()
         
+        # Handle batched data by taking first sample
+        if history.ndim == 2:
+            history = history[0]  # Take first sample from batch
+        if target.ndim == 2:
+            target = target[0]  # Take first sample from batch
+        
         # Plot history
         history_indices = np.arange(len(history))
         ax.plot(history_indices, history, 'b-', linewidth=2, label='History', alpha=0.8)
@@ -137,6 +153,11 @@ def plot_multiple_windows(
             if i in window_forecasts:
                 color = colors[j % len(colors)]
                 forecast = window_forecasts[i]
+                
+                # Handle batched forecast data by taking first sample
+                if forecast.ndim == 2:
+                    forecast = forecast[0]  # Take first sample from batch
+                
                 forecast_indices = np.arange(len(history), len(history) + len(forecast))
                 ax.plot(forecast_indices, forecast, '--', color=color, linewidth=2, 
                        label=f'{baseline_name}', alpha=0.8)
@@ -199,6 +220,12 @@ def plot_baseline_comparison(
     history = window.history()
     target = window.target()
     
+    # Handle batched data by taking first sample
+    if history.ndim == 2:
+        history = history[0]  # Take first sample from batch
+    if target.ndim == 2:
+        target = target[0]  # Take first sample from batch
+    
     # Plot 1: Time series
     history_indices = np.arange(len(history))
     ax1.plot(history_indices, history, 'b-', linewidth=2, label='History', alpha=0.8)
@@ -209,6 +236,11 @@ def plot_baseline_comparison(
     colors = ['red', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
     for i, (baseline_name, forecast) in enumerate(forecasts.items()):
         color = colors[i % len(colors)]
+        
+        # Handle batched forecast data by taking first sample
+        if forecast.ndim == 2:
+            forecast = forecast[0]  # Take first sample from batch
+        
         forecast_indices = np.arange(len(history), len(history) + len(forecast))
         ax1.plot(forecast_indices, forecast, '--', color=color, linewidth=2, 
                 label=f'{baseline_name}', alpha=0.8)

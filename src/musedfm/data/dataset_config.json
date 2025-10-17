@@ -730,6 +730,17 @@
     ],
     "description": "Dynamic data with 210 groups and 22 observation features"
   },
+  "simple_synthetic": {
+    "timestamp_col": "time",
+    "target_cols": [
+      "target"
+    ],
+    "metadata_cols": [
+      "input_1",
+      "input_2"
+    ],
+    "description": "Simple synthetic data where the target is a linear combination of the inputs"
+  },
   "large_convlag_synin_s": {
     "timestamp_col": "timestamp",
     "target_cols": [
