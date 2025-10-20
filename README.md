@@ -138,7 +138,6 @@ import numpy as np
 from typing import Optional
 
 # 1. Create your custom model class
-```python
 class MyCustomModel(BaseForecaster):
     def __init__(self, **kwargs):
     
