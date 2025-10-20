@@ -70,29 +70,55 @@ class MoiraiForecast:
         batch_size = history.shape[0]
         forecasts = np.zeros((batch_size, forecast_horizon))
         
-        
         # Check if we have sufficient data
         if history.shape[1] < 1:
             return forecasts
         
+        # Handle NaN values in input data first
+        history_clean = np.nan_to_num(history, nan=0.0)
+        
+        # Check for completely zero or constant data that might cause issues
+        for i in range(batch_size):
+            if np.all(history_clean[i] == 0) or np.std(history_clean[i]) < 1e-10:
+                # Use mean forecast for problematic data
+                forecasts[i] = np.mean(history_clean[i]) if np.mean(history_clean[i]) != 0 else 1.0
+                continue
+        
         # Normalize the data using standardized utils functions
-        history_normalized, history_mean, history_std = standard_normalize(
-            history, 
-            axis=1, 
-            keepdims=True,
-            epsilon=1e-6
-        )
-        # Handle NaN values - replace with 0.0 for processing
-        # history_normalized = np.nan_to_num(history_normalized, nan=0.0)
+        try:
+            history_normalized, history_mean, history_std = standard_normalize(
+                history_clean, 
+                axis=1, 
+                keepdims=True,
+                epsilon=1e-6
+            )
+            
+            # Check for NaN values in normalized data
+            if np.any(np.isnan(history_normalized)) or np.any(np.isnan(history_mean)) or np.any(np.isnan(history_std)):
+                # Fallback to mean forecast if normalization fails
+                return np.tile(np.nanmean(history_clean, axis=1, keepdims=True), (1, forecast_horizon))
+                
+        except Exception as e:
+            # Fallback to mean forecast if normalization fails
+            print(f"Warning: Moirai normalization failed: {e}")
+            return np.tile(np.nanmean(history_clean, axis=1, keepdims=True), (1, forecast_horizon))
         
         # Create predictor for the entire batch
-        predictor = self.model.create_predictor(batch_size=batch_size)
+        try:
+            predictor = self.model.create_predictor(batch_size=batch_size)
+        except Exception as e:
+            print(f"Warning: Moirai predictor creation failed: {e}")
+            return np.tile(np.nanmean(history_clean, axis=1, keepdims=True), (1, forecast_horizon))
         
         # Prepare data in GluonTS format following the Hugging Face example
         
         # Create dataset entries for all batch elements
         dataset_entries = []
         for i in range(batch_size):
+            # Skip if this sample already has a forecast (from problematic data check)
+            if not np.all(forecasts[i] == 0):
+                continue
+                
             # Use actual timestamps if available, otherwise use dummy dates
             if timestamps is not None and timestamps.shape[0] > i:
                 # Convert timestamps to proper format for GluonTS
@@ -111,48 +137,87 @@ class MoiraiForecast:
             }
             dataset_entries.append(dataset_entry)
         
-        # Debug: print dataset entries and normalized data
-        # print(f"Dataset entries: {len(dataset_entries)}")
-        # print(f"History normalized shape: {history_normalized.shape}")
-        # print(f"History original shape: {history.shape}")
+        # Only proceed if we have valid dataset entries
+        if not dataset_entries:
+            return forecasts
         
-        # Create dataset
-        dataset = ListDataset(dataset_entries, freq="D")
-        
-        # Generate forecasts for the entire batch
-        forecasts_list = list(predictor.predict(dataset))
-        
-        # Process forecasts in batch - extract all forecast values at once
-        if forecasts_list:
-            # Extract all forecast values as a batch (Moirai 2.0 returns median by default)
-            forecast_values = []
-            for forecast_sample in forecasts_list:
-                if forecast_sample is not None:
-                    forecast_values.append(forecast_sample.median)
-                else:
-                    # Create zero forecast for failed predictions
-                    forecast_values.append(np.zeros(forecast_horizon))
+        try:
+            # Create dataset
+            dataset = ListDataset(dataset_entries, freq="D")
             
-            # Convert to numpy array for batch processing
-            forecast_values = np.array(forecast_values)
+            # Generate forecasts for the entire batch
+            forecasts_list = list(predictor.predict(dataset))
             
-            # Ensure correct length for all forecasts at once
-            if forecast_values.shape[1] != forecast_horizon:
-                if forecast_values.shape[1] > forecast_horizon:
-                    forecast_values = forecast_values[:, :forecast_horizon]
-                else:
-                    # Pad with last values
-                    last_values = forecast_values[:, -1:] if forecast_values.shape[1] > 0 else np.zeros((batch_size, 1))
-                    padding_length = forecast_horizon - forecast_values.shape[1]
-                    padding = np.tile(last_values, (1, padding_length))
-                    forecast_values = np.concatenate([forecast_values, padding], axis=1)
-            
-            # Denormalize entire batch at once using utils function
-            forecasts = standard_denormalize(forecast_values, history_mean[:, 0:1], history_std[:, 0:1])
-        else:
-            # Fallback to mean forecast for entire batch
-            forecasts = np.tile(history_mean, (1, forecast_horizon))
+            # Process forecasts in batch - extract all forecast values at once
+            if forecasts_list:
+                # Extract all forecast values as a batch (Moirai 2.0 returns median by default)
+                forecast_values = []
+                for forecast_sample in forecasts_list:
+                    if forecast_sample is not None and hasattr(forecast_sample, 'median'):
+                        median_values = forecast_sample.median
+                        # Check for NaN values in the forecast
+                        if np.any(np.isnan(median_values)):
+                            # Use mean forecast if Moirai returns NaN
+                            forecast_values.append(np.full(forecast_horizon, np.mean(history_normalized[len(forecast_values)])))
+                        else:
+                            forecast_values.append(median_values)
+                    else:
+                        # Create mean forecast for failed predictions
+                        forecast_values.append(np.full(forecast_horizon, np.mean(history_normalized[len(forecast_values)])))
                 
+                # Convert to numpy array for batch processing
+                forecast_values = np.array(forecast_values)
+                
+                # Ensure correct length for all forecasts at once
+                if forecast_values.shape[1] != forecast_horizon:
+                    if forecast_values.shape[1] > forecast_horizon:
+                        forecast_values = forecast_values[:, :forecast_horizon]
+                    else:
+                        # Pad with last values
+                        last_values = forecast_values[:, -1:] if forecast_values.shape[1] > 0 else np.zeros((len(forecast_values), 1))
+                        padding_length = forecast_horizon - forecast_values.shape[1]
+                        padding = np.tile(last_values, (1, padding_length))
+                        forecast_values = np.concatenate([forecast_values, padding], axis=1)
+                
+                # Denormalize entire batch at once using utils function
+                try:
+                    denormalized_forecasts = standard_denormalize(forecast_values, history_mean[:len(forecast_values), 0:1], history_std[:len(forecast_values), 0:1])
+                    
+                    # Check for NaN values after denormalization
+                    if np.any(np.isnan(denormalized_forecasts)):
+                        # Fallback to mean forecast if denormalization produces NaN
+                        denormalized_forecasts = np.tile(history_mean[:len(forecast_values), 0:1], (1, forecast_horizon))
+                    
+                    # Update forecasts for the samples that were processed
+                    sample_idx = 0
+                    for i in range(batch_size):
+                        if np.all(forecasts[i] == 0):  # This sample was processed
+                            forecasts[i] = denormalized_forecasts[sample_idx]
+                            sample_idx += 1
+                            
+                except Exception as e:
+                    print(f"Warning: Moirai denormalization failed: {e}")
+                    # Fallback to mean forecast
+                    sample_idx = 0
+                    for i in range(batch_size):
+                        if np.all(forecasts[i] == 0):  # This sample was processed
+                            forecasts[i] = np.full(forecast_horizon, np.mean(history_clean[i]))
+                            sample_idx += 1
+            else:
+                # Fallback to mean forecast for entire batch
+                for i in range(batch_size):
+                    if np.all(forecasts[i] == 0):  # This sample was processed
+                        forecasts[i] = np.full(forecast_horizon, np.mean(history_clean[i]))
+                        
+        except Exception as e:
+            print(f"Warning: Moirai prediction failed: {e}")
+            # Fallback to mean forecast for all samples
+            for i in range(batch_size):
+                if np.all(forecasts[i] == 0):  # This sample was processed
+                    forecasts[i] = np.full(forecast_horizon, np.mean(history_clean[i]))
+        
+        # Final check for any remaining NaN values
+        forecasts = np.nan_to_num(forecasts, nan=0.0)
         
         return forecasts
 

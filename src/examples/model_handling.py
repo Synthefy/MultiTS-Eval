@@ -51,13 +51,15 @@ def get_available_models(device: str = "cuda:0", use_additional_models: bool = F
         # "another_model": {"model": AnotherModel(param1=value1, param2=value2), "univariate": True}
     }
     if use_additional_models:
-        from musedfm.baselines.timesfm_forecast import TimesFMForecast
         from musedfm.baselines.moirai_forecast import MoiraiForecast
         from musedfm.baselines.toto_forecast import TotoForecast
         models.update({
-            "timesfm": {"model": TimesFMForecast(device=device), "univariate": False},
             "moirai": {"model": MoiraiForecast(device=device), "univariate": True},
             "toto": {"model": TotoForecast(), "univariate": False}
+        })
+        from musedfm.baselines.timesfm_forecast import TimesFMForecast
+        models.update({
+            "timesfm": {"model": TimesFMForecast(device=device), "univariate": False}
         })
     
     return models

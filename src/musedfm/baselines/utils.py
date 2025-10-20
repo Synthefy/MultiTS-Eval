@@ -53,13 +53,33 @@ def standard_normalize(data: np.ndarray, axis: int = 1, keepdims: bool = True, e
     Returns:
         Tuple of (normalized_data, mean, std)
     """
-    mean = np.mean(data, axis=axis, keepdims=keepdims)
-    std = np.std(data, axis=axis, keepdims=keepdims)
+    # Handle NaN values first
+    data_clean = np.nan_to_num(data, nan=0.0)
     
-    # Avoid division by zero
+    mean = np.mean(data_clean, axis=axis, keepdims=keepdims)
+    std = np.std(data_clean, axis=axis, keepdims=keepdims)
+    
+    # Avoid division by zero and very small standard deviations
     std = np.maximum(std, epsilon)
     
-    normalized_data = (data - mean) / std
+    # Check for NaN values in mean or std
+    if np.any(np.isnan(mean)) or np.any(np.isnan(std)):
+        # Fallback: use global statistics
+        global_mean = np.nanmean(data_clean)
+        global_std = np.nanstd(data_clean)
+        if np.isnan(global_mean):
+            global_mean = 0.0
+        if np.isnan(global_std) or global_std < epsilon:
+            global_std = epsilon
+        
+        mean = np.full_like(mean, global_mean)
+        std = np.full_like(std, global_std)
+    
+    normalized_data = (data_clean - mean) / std
+    
+    # Final check for NaN values in normalized data
+    if np.any(np.isnan(normalized_data)):
+        normalized_data = np.nan_to_num(normalized_data, nan=0.0)
     
     return normalized_data, mean, std
 

@@ -39,6 +39,7 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     mape_per_batch = np.full(y_true.shape[0], np.nan)
 
     LOW_VARIANCE_THRESHOLD = 1e-3
+    MIN_DENOMINATOR = 1e-4  # Minimum denominator to prevent division by very small numbers
     
     # Handle low variance cases (target_std < 1e-3)
     low_variance_mask = target_std < LOW_VARIANCE_THRESHOLD
@@ -48,30 +49,29 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         # Calculate MAE for low variance cases
         mae_low_var = np.nanmean(np.abs(y_true - y_pred), axis=1, where=valid_mask)
         
-        # Constant target case (target_range < 1e-4)
+        # Constant target case (target_range < 1e-3)
         constant_mask = low_variance_mask & (target_range < LOW_VARIANCE_THRESHOLD)
         if np.any(constant_mask):
-            normalization_factor = np.maximum(np.abs(target_mean[constant_mask]), 1e-6)
+            # Use a robust normalization factor to prevent division by very small numbers
+            normalization_factor = np.maximum(np.abs(target_mean[constant_mask]), MIN_DENOMINATOR)
             mape_per_batch[constant_mask] = (mae_low_var[constant_mask] / normalization_factor) * 100
         
         # Low variance but not constant case
         low_var_not_constant_mask = low_variance_mask & (target_range >= LOW_VARIANCE_THRESHOLD)
         if np.any(low_var_not_constant_mask):
-            mape_per_batch[low_var_not_constant_mask] = (mae_low_var[low_var_not_constant_mask] / target_range[low_var_not_constant_mask]) * 100
-        
-        # Cap MAPE at 1000% for low variance cases only
-        mape_per_batch[low_variance_mask] = np.minimum(mape_per_batch[low_variance_mask], 1000.0)
+            # Use range for normalization, but ensure it's not too small
+            normalization_factor = np.maximum(target_range[low_var_not_constant_mask], MIN_DENOMINATOR)
+            mape_per_batch[low_var_not_constant_mask] = (mae_low_var[low_var_not_constant_mask] / normalization_factor) * 100
     
-    # Handle normal cases (target_std >= 1e-4)
+    # Handle normal cases (target_std >= 1e-3)
     normal_mask = target_std >= LOW_VARIANCE_THRESHOLD
     normal_mask = normal_mask & ~empty_batches
     
     if np.any(normal_mask):
         # Calculate minimum threshold for each batch element
-        min_threshold = np.maximum(target_std[normal_mask] * 0.01, 1e-6)
+        min_threshold = np.maximum(target_std[normal_mask] * 0.01, MIN_DENOMINATOR)
         
         # Create mask for values above threshold (per batch element)
-        # Only apply threshold mask to normal_mask elements
         threshold_mask = np.zeros_like(y_true, dtype=bool)
         threshold_mask[normal_mask] = np.abs(y_true[normal_mask]) > min_threshold[:, np.newaxis]
         combined_mask = valid_mask & threshold_mask & normal_mask[:, np.newaxis]
@@ -81,13 +81,21 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         for i, batch_idx in enumerate(np.where(normal_mask)[0]):
             batch_combined_mask = combined_mask[batch_idx]
             if np.any(batch_combined_mask):
-                mape_normal[i] = np.nanmean(np.abs((y_true[batch_idx] - y_pred[batch_idx]) / y_true[batch_idx]), where=batch_combined_mask) * 100
+                # Calculate MAPE with robust denominator handling
+                y_true_batch = y_true[batch_idx]
+                y_pred_batch = y_pred[batch_idx]
+                
+                # Ensure denominator is never too small to prevent overflow
+                denominator = np.maximum(np.abs(y_true_batch), min_threshold[i])
+                mape_values = np.abs((y_true_batch - y_pred_batch) / denominator) * 100
+                mape_normal[i] = np.nanmean(mape_values, where=batch_combined_mask)
         
         # Handle cases where all values are too small
         small_values_mask = normal_mask & ~np.any(threshold_mask & valid_mask, axis=1)
         if np.any(small_values_mask):
             mae_small = np.nanmean(np.abs(y_true - y_pred), axis=1, where=valid_mask)
-            normalization_factor = np.maximum(np.abs(target_mean[small_values_mask]), 1e-6)
+            # Use a robust normalization factor to prevent division by very small numbers
+            normalization_factor = np.maximum(np.abs(target_mean[small_values_mask]), MIN_DENOMINATOR)
             mape_per_batch[small_values_mask] = (mae_small[small_values_mask] / normalization_factor) * 100
         
         # Set normal case MAPE values
@@ -95,6 +103,7 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         normal_indices = np.where(normal_with_data_mask)[0]
         for i, batch_idx in enumerate(normal_indices):
             mape_per_batch[batch_idx] = mape_normal[i]
+    
     return mape_per_batch
 
 
@@ -252,6 +261,9 @@ def evaluate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, np.nda
     Returns:
         Dictionary containing metric vectors (one per batch element)
     """
+    # Let individual metric functions handle NaN values per batch
+    # They will return NaN for batches with no valid data, which will be
+    # automatically skipped during aggregation using np.nanmean()
     return {
         'MAPE': MAPE(y_true, y_pred),
         'MAE': MAE(y_true, y_pred),
