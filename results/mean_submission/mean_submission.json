@@ -1,0 +1,1081 @@
+[
+  {
+    "domain": "Stock",
+    "category": "collections",
+    "dataset": "stock_nasdaqtrader",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 995.1785190528401,
+      "RMSE": 995.3778166659135,
+      "Multi-MAPE": 1830.1983981093183,
+      "Uni-MAPE": 1830.1983981093183,
+      "NMAE": 2.2736757287592733
+    }
+  },
+  {
+    "domain": "Wikipedia",
+    "category": "collections",
+    "dataset": "wikipedia",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 805.454553021144,
+      "RMSE": 1825.3167263578828,
+      "Multi-MAPE": 87.40231142237805,
+      "Uni-MAPE": 87.40231142237805,
+      "NMAE": 0.779891738487529
+    }
+  },
+  {
+    "domain": "Image",
+    "category": "sequential",
+    "dataset": "cifar100_timeseries_csvs",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2.767826680481715,
+      "RMSE": 3.839319458573286,
+      "Multi-MAPE": 155.64830329757515,
+      "Uni-MAPE": 155.64830329757515,
+      "NMAE": 0.8069621655454355
+    }
+  },
+  {
+    "domain": "Scientific",
+    "category": "sequential",
+    "dataset": "ant_csv_out",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.8214484172326308,
+      "RMSE": 1.6027365767858448,
+      "Multi-MAPE": 152.6968749537477,
+      "Uni-MAPE": 152.6968749537477,
+      "NMAE": 0.5072676305063754
+    }
+  },
+  {
+    "domain": "Scientific",
+    "category": "sequential",
+    "dataset": "cheetah_csv_out",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 5.867438493228072,
+      "RMSE": 7.265811781890677,
+      "Multi-MAPE": 100.43770536181644,
+      "Uni-MAPE": 100.43770536181644,
+      "NMAE": 0.8071484564406275
+    }
+  },
+  {
+    "domain": "Scientific",
+    "category": "sequential",
+    "dataset": "hopper_csv_out",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 5.171039010075923,
+      "RMSE": 6.068764242132099,
+      "Multi-MAPE": 116.94322772187414,
+      "Uni-MAPE": 116.94322772187414,
+      "NMAE": 0.8723579086147885
+    }
+  },
+  {
+    "domain": "Scientific",
+    "category": "sequential",
+    "dataset": "spriteworld",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2.039409738470459,
+      "RMSE": 2.3354644030566187,
+      "Multi-MAPE": 193.81980982581447,
+      "Uni-MAPE": 193.81980982581447,
+      "NMAE": 1.3740624600912823
+    }
+  },
+  {
+    "domain": "Scientific",
+    "category": "sequential",
+    "dataset": "walker2d_csv_out",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 4.357880915455063,
+      "RMSE": 5.579193602404976,
+      "Multi-MAPE": 260.86030117483847,
+      "Uni-MAPE": 260.86030117483847,
+      "NMAE": 0.8684733063244139
+    }
+  },
+  {
+    "domain": "Text",
+    "category": "sequential",
+    "dataset": "openwebtext_timeseries_csvs",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1.3934279838308812,
+      "RMSE": 1.6701117213331722,
+      "Multi-MAPE": 203.3999649748292,
+      "Uni-MAPE": 203.3999649748292,
+      "NMAE": 1.3323764825008662
+    }
+  },
+  {
+    "domain": "Video",
+    "category": "sequential",
+    "dataset": "KITTI",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 56.34992371835479,
+      "RMSE": 74.91379989210833,
+      "Multi-MAPE": 59.27791284565605,
+      "Uni-MAPE": 59.27791284565605,
+      "NMAE": 1.126680211551925
+    }
+  },
+  {
+    "domain": "Causal Model",
+    "category": "synthetic",
+    "dataset": "large_convlag_synin_s",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.7547744807680661,
+      "RMSE": 0.9614154225743916,
+      "Multi-MAPE": 158.5191788113657,
+      "Uni-MAPE": 158.5191788113657,
+      "NMAE": 0.9669476084583201
+    }
+  },
+  {
+    "domain": "Causal Model",
+    "category": "synthetic",
+    "dataset": "medium_convlag_synin_s",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.775748243006854,
+      "RMSE": 0.9741724398032927,
+      "Multi-MAPE": 187.55240394333438,
+      "Uni-MAPE": 187.55240394333438,
+      "NMAE": 1.0495484930931098
+    }
+  },
+  {
+    "domain": "Causal Model",
+    "category": "synthetic",
+    "dataset": "medium_obslag_synin_s",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.8236309876315411,
+      "RMSE": 1.0429855807005666,
+      "Multi-MAPE": 166.07820312671888,
+      "Uni-MAPE": 166.07820312671888,
+      "NMAE": 1.0056166348333084
+    }
+  },
+  {
+    "domain": "Causal Model",
+    "category": "synthetic",
+    "dataset": "tiny_convlag_synin_ns",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.8376687902364216,
+      "RMSE": 1.073892791853436,
+      "Multi-MAPE": 183.1764695032368,
+      "Uni-MAPE": 183.1764695032368,
+      "NMAE": 1.1398695031744903
+    }
+  },
+  {
+    "domain": "Causal Model",
+    "category": "synthetic",
+    "dataset": "tiny_obslag_synin_ns",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.8404835157376271,
+      "RMSE": 1.0576547075311606,
+      "Multi-MAPE": 153.03449980923423,
+      "Uni-MAPE": 153.03449980923423,
+      "NMAE": 1.154918489587772
+    }
+  },
+  {
+    "domain": "Dynamic",
+    "category": "synthetic",
+    "dataset": "dynamic_data_csvs",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2.6938066553269415,
+      "RMSE": 3.0853761947506566,
+      "Multi-MAPE": 124.2324992928588,
+      "Uni-MAPE": 124.2324992928588,
+      "NMAE": 1.1500465990508817
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "al_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 78269.48991141832,
+      "RMSE": 97070.96609802489,
+      "Multi-MAPE": 11.717050219108728,
+      "Uni-MAPE": 11.717050219108728,
+      "NMAE": 0.8703718930679212
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "az_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 7448.250834932483,
+      "RMSE": 8494.791169177899,
+      "Multi-MAPE": 22.10259268298611,
+      "Uni-MAPE": 22.10259268298611,
+      "NMAE": 1.5441151062074263
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "az_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1835.360713849298,
+      "RMSE": 2171.064543356048,
+      "Multi-MAPE": 12.601982138563585,
+      "Uni-MAPE": 12.601982138563585,
+      "NMAE": 0.8825948927599017
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "cal_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 86059.46698106859,
+      "RMSE": 110114.29522966847,
+      "Multi-MAPE": 10.801589234302401,
+      "Uni-MAPE": 10.801589234302401,
+      "NMAE": 1.2720110796420372
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "cal_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2911.5980572972508,
+      "RMSE": 3519.042921319136,
+      "Multi-MAPE": 9.622124775258238,
+      "Uni-MAPE": 9.622124775258238,
+      "NMAE": 0.8989974532877015
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "car_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 80965.92463655413,
+      "RMSE": 102041.82965145665,
+      "Multi-MAPE": 12.501792473263835,
+      "Uni-MAPE": 12.501792473263835,
+      "NMAE": 0.9078536914082497
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "car_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 4636.223420733104,
+      "RMSE": 5378.243793082484,
+      "Multi-MAPE": 17.05942185810537,
+      "Uni-MAPE": 17.05942185810537,
+      "NMAE": 1.0722608278200367
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "central_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.7107497563315558,
+      "RMSE": 0.8310924753162279,
+      "Multi-MAPE": 9.306101248791464,
+      "Uni-MAPE": 9.306101248791464,
+      "NMAE": 1.1061991209128041
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "co_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 12844.239798169243,
+      "RMSE": 16091.399865988544,
+      "Multi-MAPE": 10.264401437857922,
+      "Uni-MAPE": 10.264401437857922,
+      "NMAE": 1.100815044374398
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "eastern_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.37403315060887093,
+      "RMSE": 0.45693528381525267,
+      "Multi-MAPE": 16.35188911797461,
+      "Uni-MAPE": 16.35188911797461,
+      "NMAE": 0.9067000829372972
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "ecl",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 5.5866981157796625,
+      "RMSE": 6.841407453583165,
+      "Multi-MAPE": 109.9922434580657,
+      "Uni-MAPE": 109.9922434580657,
+      "NMAE": 0.9546383567030462
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "ercot_load",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1543.9836461463128,
+      "RMSE": 1834.7649727352662,
+      "Multi-MAPE": 14.016303940452318,
+      "Uni-MAPE": 14.016303940452318,
+      "NMAE": 0.9504374461866749
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "fl_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 117739.04891009914,
+      "RMSE": 130747.39260305207,
+      "Multi-MAPE": 17.667569624416192,
+      "Uni-MAPE": 17.667569624416192,
+      "NMAE": 1.6653546073617507
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "id_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 281.90507231806527,
+      "RMSE": 340.03122450214676,
+      "Multi-MAPE": 12.039027471282688,
+      "Uni-MAPE": 12.039027471282688,
+      "NMAE": 1.081381286201338
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "mds_microgrid",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.09941520690917968,
+      "RMSE": 0.12215470823669605,
+      "Multi-MAPE": 63.95608995612484,
+      "Uni-MAPE": 63.95608995612484,
+      "NMAE": 0.8183649649628489
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "ne_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 38999.134473943435,
+      "RMSE": 49697.635756024414,
+      "Multi-MAPE": 11.388579710943333,
+      "Uni-MAPE": 11.388579710943333,
+      "NMAE": 1.1282742543755302
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "ne_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2128.312945830153,
+      "RMSE": 2557.5167213993677,
+      "Multi-MAPE": 15.673013837786764,
+      "Uni-MAPE": 15.673013837786764,
+      "NMAE": 1.0203775113642493
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "nm_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 3687.3282249973117,
+      "RMSE": 4814.849819180669,
+      "Multi-MAPE": 8.513898266166647,
+      "Uni-MAPE": 8.513898266166647,
+      "NMAE": 1.0620350686026039
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "northern_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.7898858919021494,
+      "RMSE": 0.9116727197526618,
+      "Multi-MAPE": 12.919852632985958,
+      "Uni-MAPE": 12.919852632985958,
+      "NMAE": 0.9078577316152571
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "ny_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 42701.607097346845,
+      "RMSE": 55699.82846496006,
+      "Multi-MAPE": 9.55543638554862,
+      "Uni-MAPE": 9.55543638554862,
+      "NMAE": 0.9992774517635252
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "ny_electricity2025",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2267.609921341562,
+      "RMSE": 2703.099132362499,
+      "Multi-MAPE": 12.096481580447458,
+      "Uni-MAPE": 12.096481580447458,
+      "NMAE": 1.0140018173898746
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "or_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 277.8157907824013,
+      "RMSE": 342.1878157745758,
+      "Multi-MAPE": 10.74361480190779,
+      "Uni-MAPE": 10.74361480190779,
+      "NMAE": 0.9294164402213767
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "pa_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 248017.38746791292,
+      "RMSE": 309506.37375508464,
+      "Multi-MAPE": 10.727836933333055,
+      "Uni-MAPE": 10.727836933333055,
+      "NMAE": 1.0028922109016913
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "pa_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 11939.773473824076,
+      "RMSE": 14019.775264695201,
+      "Multi-MAPE": 11.635446504706959,
+      "Uni-MAPE": 11.635446504706959,
+      "NMAE": 1.1488308826889997
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "se_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 4260.48293308055,
+      "RMSE": 4965.924978893222,
+      "Multi-MAPE": 15.158185255058445,
+      "Uni-MAPE": 15.158185255058445,
+      "NMAE": 1.0335357701666326
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "solar_alabama",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 7.642128799438476,
+      "RMSE": 8.916626577332732,
+      "Multi-MAPE": 238.31927703574326,
+      "Uni-MAPE": 238.31927703574326,
+      "NMAE": 0.9684017721695052
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "southern_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1.0956999218545533,
+      "RMSE": 1.391628571100852,
+      "Multi-MAPE": 8.467773646571363,
+      "Uni-MAPE": 8.467773646571363,
+      "NMAE": 1.00448518325981
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "tn_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 55559.39885391366,
+      "RMSE": 69799.63350160317,
+      "Multi-MAPE": 11.997910858166467,
+      "Uni-MAPE": 11.997910858166467,
+      "NMAE": 0.8940460919087301
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "tn_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 3141.4785507619195,
+      "RMSE": 3673.917944319878,
+      "Multi-MAPE": 15.777406279970538,
+      "Uni-MAPE": 15.777406279970538,
+      "NMAE": 1.0894924799941565
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "tx_daily",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 145994.212221632,
+      "RMSE": 173157.3685950071,
+      "Multi-MAPE": 12.638478641425849,
+      "Uni-MAPE": 12.638478641425849,
+      "NMAE": 1.4576055285136853
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "tx_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 6996.390653356401,
+      "RMSE": 8134.816201930829,
+      "Multi-MAPE": 12.506643212608997,
+      "Uni-MAPE": 12.506643212608997,
+      "NMAE": 0.9902260486747523
+    }
+  },
+  {
+    "domain": "Energy",
+    "category": "traditional",
+    "dataset": "western_electricity",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1.810301465707055,
+      "RMSE": 2.0703016408940074,
+      "Multi-MAPE": 11.3817633829683,
+      "Uni-MAPE": 11.3817633829683,
+      "NMAE": 1.1836784642426403
+    }
+  },
+  {
+    "domain": "Engineering",
+    "category": "traditional",
+    "dataset": "ev-sensors",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 16.102423969717112,
+      "RMSE": 18.778603486383325,
+      "Multi-MAPE": 37.962845235823586,
+      "Uni-MAPE": 37.962845235823586,
+      "NMAE": 0.8640648554034667
+    }
+  },
+  {
+    "domain": "Engineering",
+    "category": "traditional",
+    "dataset": "voip",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.04622298791226316,
+      "RMSE": 0.04826446131595721,
+      "Multi-MAPE": 1.144361567131808,
+      "Uni-MAPE": 1.144361567131808,
+      "NMAE": 1.1180903253507064
+    }
+  },
+  {
+    "domain": "Environment",
+    "category": "traditional",
+    "dataset": "beijing_aq",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 61.257606727122635,
+      "RMSE": 73.85580569677475,
+      "Multi-MAPE": 255.70785927580138,
+      "Uni-MAPE": 255.70785927580138,
+      "NMAE": 1.1028730158406252
+    }
+  },
+  {
+    "domain": "Environment",
+    "category": "traditional",
+    "dataset": "beijing_embassy",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 71.01863093884523,
+      "RMSE": 86.10912948997424,
+      "Multi-MAPE": 183.81572716448707,
+      "Uni-MAPE": 183.81572716448707,
+      "NMAE": 1.0567048143807936
+    }
+  },
+  {
+    "domain": "Environment",
+    "category": "traditional",
+    "dataset": "causalrivers",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.8395512673215623,
+      "RMSE": 0.9115104472800175,
+      "Multi-MAPE": 17.658848757090635,
+      "Uni-MAPE": 17.658848757090635,
+      "NMAE": 1.8744791861009373
+    }
+  },
+  {
+    "domain": "Environment",
+    "category": "traditional",
+    "dataset": "gas_sensor",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 7.604119140625001,
+      "RMSE": 7.980738277462393,
+      "Multi-MAPE": 10.771484375,
+      "Uni-MAPE": 10.771484375,
+      "NMAE": 0.057385341075294
+    }
+  },
+  {
+    "domain": "Environment",
+    "category": "traditional",
+    "dataset": "oikolab_weather",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 3.249511265563965,
+      "RMSE": 3.9827865883743927,
+      "Multi-MAPE": 24.68370073070525,
+      "Uni-MAPE": 24.68370073070525,
+      "NMAE": 0.9548899235255189
+    }
+  },
+  {
+    "domain": "Environment",
+    "category": "traditional",
+    "dataset": "open_aq",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 10.7385042969809,
+      "RMSE": 15.19468312598868,
+      "Multi-MAPE": 496.5531644825713,
+      "Uni-MAPE": 496.5531644825713,
+      "NMAE": 1.0610102227968916
+    }
+  },
+  {
+    "domain": "Environment",
+    "category": "traditional",
+    "dataset": "weather_mpi",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 79.2998990967927,
+      "RMSE": 95.74367706979476,
+      "Multi-MAPE": 113.13737888695505,
+      "Uni-MAPE": 113.13737888695505,
+      "NMAE": 1.342691110607653
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md1",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 4502.095111462729,
+      "RMSE": 5190.569063304018,
+      "Multi-MAPE": 66.3647585222136,
+      "Uni-MAPE": 66.3647585222136,
+      "NMAE": 0.8677549072725502
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md2",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1.3512863714150105,
+      "RMSE": 1.7120270124138155,
+      "Multi-MAPE": 24.420080344662026,
+      "Uni-MAPE": 24.420080344662026,
+      "NMAE": 0.7924477182314741
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md3",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 278.88374743380706,
+      "RMSE": 363.0513092771582,
+      "Multi-MAPE": 23.466627634501744,
+      "Uni-MAPE": 23.466627634501744,
+      "NMAE": 0.7688508621907673
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md4",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 11.014154449404094,
+      "RMSE": 13.119884771563662,
+      "Multi-MAPE": 14.03126525666699,
+      "Uni-MAPE": 14.03126525666699,
+      "NMAE": 0.8402386357660306
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md5",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 893.1340481545643,
+      "RMSE": 1134.850573944507,
+      "Multi-MAPE": 1228.574486069754,
+      "Uni-MAPE": 1228.574486069754,
+      "NMAE": 0.787300755268919
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md6",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2.8099446666101144,
+      "RMSE": 3.6185687633062336,
+      "Multi-MAPE": 678.5313829643004,
+      "Uni-MAPE": 678.5313829643004,
+      "NMAE": 0.7771339891012022
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md7",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 74.24242936468642,
+      "RMSE": 85.56603839768498,
+      "Multi-MAPE": 103.29611809192818,
+      "Uni-MAPE": 103.29611809192818,
+      "NMAE": 0.8681016140421525
+    }
+  },
+  {
+    "domain": "Finance",
+    "category": "traditional",
+    "dataset": "fred_md8",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 943.9562017666082,
+      "RMSE": 1284.1504021270366,
+      "Multi-MAPE": 420.4690235859044,
+      "Uni-MAPE": 420.4690235859044,
+      "NMAE": 0.7370642698059034
+    }
+  },
+  {
+    "domain": "Health",
+    "category": "traditional",
+    "dataset": "cgm",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 63.96795782542752,
+      "RMSE": 73.53227545436548,
+      "Multi-MAPE": 50.31531965653468,
+      "Uni-MAPE": 50.31531965653468,
+      "NMAE": 1.1808499441325024
+    }
+  },
+  {
+    "domain": "Health",
+    "category": "traditional",
+    "dataset": "sleep_lab",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 6.100550184562067,
+      "RMSE": 7.103966400109995,
+      "Multi-MAPE": 149.10563361505882,
+      "Uni-MAPE": 149.10563361505882,
+      "NMAE": 1.0700408852159324
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "austin_water",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 348373796.2388261,
+      "RMSE": 467342297.0990129,
+      "Multi-MAPE": 14.681389263012509,
+      "Uni-MAPE": 14.681389263012509,
+      "NMAE": 0.8352756540766384
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "blue_bikes",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 293.32250193622707,
+      "RMSE": 358.9926616240442,
+      "Multi-MAPE": 505.55959895151346,
+      "Uni-MAPE": 505.55959895151346,
+      "NMAE": 0.8541671538427685
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "lyft",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 12.35466576081415,
+      "RMSE": 12.91645969621013,
+      "Multi-MAPE": 63.81370898393815,
+      "Uni-MAPE": 63.81370898393815,
+      "NMAE": 1.9909852692295433
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "mn_interstate",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1733.7789802975199,
+      "RMSE": 1974.3546214967328,
+      "Multi-MAPE": 172.46554499808786,
+      "Uni-MAPE": 172.46554499808786,
+      "NMAE": 0.8915609060957723
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "mta_ridership",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 676988.2824577363,
+      "RMSE": 788865.5139106672,
+      "Multi-MAPE": 31.0472697612255,
+      "Uni-MAPE": 31.0472697612255,
+      "NMAE": 1.0035158787872698
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "paris_mobility",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 15003.185306125217,
+      "RMSE": 17256.96548007897,
+      "Multi-MAPE": 13.216132131381045,
+      "Uni-MAPE": 13.216132131381045,
+      "NMAE": 0.9325455180399542
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "tac",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.04818723360785133,
+      "RMSE": 0.060873985037637794,
+      "Multi-MAPE": 430.4576368061388,
+      "Uni-MAPE": 430.4576368061388,
+      "NMAE": 1.1179391125472191
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "traffic_PeMS",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 0.031702272399902344,
+      "RMSE": 0.042717408030701315,
+      "Multi-MAPE": 169.3758034260315,
+      "Uni-MAPE": 169.3758034260315,
+      "NMAE": 0.7744199484709975
+    }
+  },
+  {
+    "domain": "Public Info",
+    "category": "traditional",
+    "dataset": "uber",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 11.229174712434562,
+      "RMSE": 11.722199153316282,
+      "Multi-MAPE": 63.87666482555518,
+      "Uni-MAPE": 63.87666482555518,
+      "NMAE": 1.991939598178101
+    }
+  },
+  {
+    "domain": "Sales",
+    "category": "traditional",
+    "dataset": "bitcoin_price",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 4940427584.711275,
+      "RMSE": 5815231444.044275,
+      "Multi-MAPE": 66.58587239631802,
+      "Uni-MAPE": 66.58587239631802,
+      "NMAE": 1.2578615146197312
+    }
+  },
+  {
+    "domain": "Sales",
+    "category": "traditional",
+    "dataset": "blow_molding",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 16.159472799831963,
+      "RMSE": 19.41247071121117,
+      "Multi-MAPE": 25.302204413244638,
+      "Uni-MAPE": 25.302204413244638,
+      "NMAE": 0.8382237785601738
+    }
+  },
+  {
+    "domain": "Sales",
+    "category": "traditional",
+    "dataset": "gold_prices",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 10765.458333333334,
+      "RMSE": 11942.461781472526,
+      "Multi-MAPE": 100.20009037335956,
+      "Uni-MAPE": 100.20009037335956,
+      "NMAE": 0.9018770156552136
+    }
+  },
+  {
+    "domain": "Sales",
+    "category": "traditional",
+    "dataset": "pasta_sales",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 2.601337055758197,
+      "RMSE": 4.3078868173474945,
+      "Multi-MAPE": 86.79232329183372,
+      "Uni-MAPE": 86.79232329183372,
+      "NMAE": 0.7485602014543229
+    }
+  },
+  {
+    "domain": "Sales",
+    "category": "traditional",
+    "dataset": "rice_prices",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 55.13485355403648,
+      "RMSE": 72.2872248584053,
+      "Multi-MAPE": 43.70020058190918,
+      "Uni-MAPE": 43.70020058190918,
+      "NMAE": 1.2259566358220355
+    }
+  },
+  {
+    "domain": "Sales",
+    "category": "traditional",
+    "dataset": "walmart-sales",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 476141.388765378,
+      "RMSE": 569747.287209715,
+      "Multi-MAPE": 66.91779457710237,
+      "Uni-MAPE": 66.91779457710237,
+      "NMAE": 0.8506967917905283
+    }
+  },
+  {
+    "domain": "Web",
+    "category": "traditional",
+    "dataset": "website_visitors",
+    "dataset_version": "v1.0",
+    "metrics": {
+      "MAE": 1030.2806302750587,
+      "RMSE": 1244.348391834118,
+      "Multi-MAPE": 31.793458937668806,
+      "Uni-MAPE": 31.793458937668806,
+      "NMAE": 0.9271420542417269
+    }
+  }
+]

@@ -1,0 +1,9 @@
+{
+    "model": "Historical Mean",
+    "submitter": "Synthefy",
+    "submission_date": "2025-10-10",
+    "task": "multivariate_forecasting",
+    "paper_url": "https://github.com/Synthefy/MUSED-FM",
+    "code_url": "https://github.com/Synthefy/MUSED-FM/blob/main/src/musedfm/baselines/mean_forecast.py",
+    "description": "Uses the mean of the historical values to predict the future"
+}
