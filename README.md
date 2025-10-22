@@ -28,7 +28,7 @@ tar -xzf ./multits-eval-data/synthetic.tar.gz -C <your target folder>/multits-ev
 ## Installation
 
 ### Prerequisites
-- Python 3.9 or higher
+- Python 3.11 or higher
 - [uv](https://docs.astral.sh/uv/) package manager
 
 ### Install Dependencies
