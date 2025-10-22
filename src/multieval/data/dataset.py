@@ -10,11 +10,11 @@ import random
 from datetime import datetime, timedelta
 from typing import List, Iterator, Dict, Any, Optional, Union
 from pathlib import Path
-from musedfm.data.window import Window
+from multieval.data.window import Window
 
-from musedfm.data.special_loaders.open_aq_special import OpenAQSpecialLoader
-from musedfm.data.special_loaders.kitti_special import KITTISpecialLoader
-from musedfm.data.special_loaders.ecl_special import ECLSpecialLoader
+from multieval.data.special_loaders.open_aq_special import OpenAQSpecialLoader
+from multieval.data.special_loaders.kitti_special import KITTISpecialLoader
+from multieval.data.special_loaders.ecl_special import ECLSpecialLoader
 
 
 class Dataset:

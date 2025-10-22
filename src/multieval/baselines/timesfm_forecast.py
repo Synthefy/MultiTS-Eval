@@ -5,7 +5,7 @@ TimesFM 2.5 forecasting model for MUSED-FM evaluation.
 import numpy as np
 import torch
 from typing import Optional
-from musedfm.baselines.utils import standard_normalize
+from multieval.baselines.utils import standard_normalize
 
 
 class TimesFMForecast:

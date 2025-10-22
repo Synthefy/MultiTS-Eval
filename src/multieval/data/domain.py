@@ -4,7 +4,7 @@ Domain class for encapsulating multiple datasets.
 
 from typing import Iterator, Dict, List
 from pathlib import Path
-from musedfm.data.dataset import Dataset
+from multieval.data.dataset import Dataset
 
 
 class Domain:

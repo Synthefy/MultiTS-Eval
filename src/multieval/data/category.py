@@ -6,7 +6,7 @@ import os
 import json
 from typing import Iterator, Dict, Any, List
 from pathlib import Path
-from musedfm.data.domain import Domain
+from multieval.data.domain import Domain
 from collections import OrderedDict
 
 class Category:

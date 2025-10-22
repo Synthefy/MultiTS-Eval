@@ -1,4 +1,4 @@
-# MUSED-FM: Multivariate Time Series Evaluation Dataset for Foundation Models
+# MultiTS-Eval: Multivariate Time Series Evaluation Dataset for Foundation Models
 
 A multivariate-first foundation model evaluation dataset that focuses on identifying a model's ability to leverage other useful time series for forecasting a single target time series. This codebase provides tooling and APIs for iterating through and evaluating metrics on the dataset, performing both univariate (just the target) and multivariate forecasting, and stratifying results according to different types of data according to different levels of complexity. 
 
@@ -8,19 +8,19 @@ A multivariate-first foundation model evaluation dataset that focuses on identif
 
 **Clone the dataset repo (requires git-lfs, ~100GB):**
 ```bash
-git clone git@hf.co:datasets/Synthefy/MUSED-FM ./mused-fm-data
+git clone git@hf.co:datasets/Synthefy/MultiTS-Eval ./multits-eval-data
 ```
 
 **Create the directory structure and extract to target directory**
 ```bash
 # Create directory structure in shared memory for faster I/O
-mkdir -p <your target folder>/mused-fm-nested/{collections,traditional,sequential,synthetic}
+mkdir -p <your target folder>/multits-eval-nested/{collections,traditional,sequential,synthetic}
 
 # Extract archives to shared memory
-tar -xzf ./mused-fm-data/collections.tar.gz -C <your target folder>/mused-fm-nested &
-tar -xzf ./mused-fm-data/traditional.tar.gz -C <your target folder>/mused-fm-nested/traditional &
-tar -xzf ./mused-fm-data/sequential.tar.gz -C <your target folder>/mused-fm-nested/sequential &
-tar -xzf ./mused-fm-data/synthetic.tar.gz -C <your target folder>/mused-fm-nested/synthetic &
+tar -xzf ./multits-eval-data/collections.tar.gz -C <your target folder>/multits-eval-nested &
+tar -xzf ./multits-eval-data/traditional.tar.gz -C <your target folder>/multits-eval-nested/traditional &
+tar -xzf ./multits-eval-data/sequential.tar.gz -C <your target folder>/multits-eval-nested/sequential &
+tar -xzf ./multits-eval-data/synthetic.tar.gz -C <your target folder>/multits-eval-nested/synthetic &
 ```
 
 ---
@@ -46,7 +46,7 @@ uv sync
 
 ```
 
-### Install MUSED-FM
+### Install MultiTS-Eval
 ```bash
 # Install in development mode
 uv pip install -e .
@@ -56,18 +56,18 @@ uv pip install -e .
 
 ### Running the Benchmark
 
-MUSED-FM provides two main evaluation scripts for different use cases:
+MultiTS-Eval provides two main evaluation scripts for different use cases:
 
-#### 1. `run_musedfm.py` - Main Evaluation Script
+#### 1. `run_multieval.py` - Main Evaluation Script
 
 The primary script for running baseline models with visualization and CSV export capabilities:
 
 ```bash
 # Run all models on all datasets with plots and CSV export and save exports
-uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-fm-nested --models all --plots --load-cached-counts --output-dir <your target folder>/mused-fm-outputs/results --forecast-save-path <your target folder>/mused-fm-outputs/forecasts --batch-size 8
+uv run src/examples/run_multieval.py --benchmark-path <your target folder>/multits-eval-nested --models all --plots --load-cached-counts --output-dir <your target folder>/multits-eval-outputs/results --forecast-save-path <your target folder>/multits-eval-outputs/forecasts --batch-size 8
 
 # Debug mode (limited windows)
-uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-fm-nested --models all --load-cached-counts --plots --output-dir <your target folder>/results --forecast-save-path <your target folder>/forecasts --windows 200 --debug-mode --batch-size 8
+uv run src/examples/run_multieval.py --benchmark-path <your target folder>/multits-eval-nested --models all --load-cached-counts --plots --output-dir <your target folder>/results --forecast-save-path <your target folder>/forecasts --windows 200 --debug-mode --batch-size 8
 ```
 
 **Key Arguments:**
@@ -76,13 +76,13 @@ uv run src/examples/run_musedfm.py --benchmark-path <your target folder>/mused-f
 - Uses cached window counts for faster startup (`--load-cached-counts`)
 - Flexible filtering by categories, domains, and datasets
 
-#### 2. `eval_musedfm.py` - Evaluation Script with Forecast Saving
+#### 2. `eval_multieval.py` - Evaluation Script with Forecast Saving
 
 Specialized script for just forecast evaluation:
 
 ```bash
 # Use cached window counts for faster execution
-uv run src/examples/eval_musedfm.py --benchmark-path <your target folder>mused-fm-nested --models all --load-cached-counts --output-dir <your target folder>/results
+uv run src/examples/eval_multieval.py --benchmark-path <your target folder>multits-eval-nested --models all --load-cached-counts --output-dir <your target folder>/results
 ```
 
 **Key Features:**
@@ -97,7 +97,7 @@ Both scripts support the following common arguments:
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `--benchmark-path` | Path to benchmark directory | `/home/caleb/musedfm_data` |
+| `--benchmark-path` | Path to benchmark directory | `../multits_eval_data` |
 | `--models` | Comma-separated list of models or 'all' | `mean,linear_trend` |
 | `--categories` | Filter by categories (e.g., 'traditional,synthetic') | All |
 | `--domains` | Filter by domains (e.g., 'Energy,Finance') | All |
@@ -108,14 +108,14 @@ Both scripts support the following common arguments:
 | `--stride` | Stride between windows | 256 |
 | `--load-cached-counts` | Use cached window counts | False |
 
-**run_musedfm.py specific arguments:**
+**run_multieval.py specific arguments:**
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--plots` | Generate forecast plots | False |
 | `--output-dir` | Output directory for plots/CSV | `/tmp` |
 | `--debug-mode` | Enable debug mode | False |
 
-**eval_musedfm.py specific arguments:**
+**eval_multieval.py specific arguments:**
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--forecast-save-path` | Path to save forecasts | `/tmp` |
@@ -125,15 +125,15 @@ Both scripts support the following common arguments:
 
 The above commands will only run the existing baselines. To use the tools in this repo to add your own model, you first need to create a model class with the desired features. Then using an instance of that class, there are three ways to add a new model, which we discuss below:
 - Add your model to the model_handling.py file
-- Utilize the functions in run_musedfm.py to evaluate your model
+- Utilize the functions in run_multieval.py to evaluate your model
 - Use the iterator to iterate through the dataset directly
 
 ### Creating A model Class
 ## Adding Custom Models
 ```python
-from examples.run_musedfm import run_models_on_benchmark, compare_model_performance
+from examples.run_multieval import run_models_on_benchmark, compare_model_performance
 from examples.utils import parse_models
-from musedfm.baselines.base_forecaster import BaseForecaster
+from multieval.baselines.base_forecaster import BaseForecaster
 import numpy as np
 from typing import Optional
 
@@ -168,7 +168,7 @@ class MyCustomModel(BaseForecaster):
 
 ### Modify model_handling with your custom model
 
-Instead of modifying the `run_musedfm.py` file, you can use the evaluation functions directly with your custom models by updating the models file in examples/model_handling.py:
+Instead of modifying the `run_multieval.py` file, you can use the evaluation functions directly with your custom models by updating the models file in examples/model_handling.py:
 
 **Create model dictionary for evaluation**
 ```python
@@ -178,8 +178,8 @@ def get_custom_models():
     }
 ```
 
-### use functions from run_musedfm.py
-Using the function from run_musedfm can give more fine-grain control, especially if you intend to change the data iteration pipeline.
+### use functions from run_multieval.py
+Using the function from run_multieval can give more fine-grain control, especially if you intend to change the data iteration pipeline.
 
 ```python
 # Import functions from the examples package
@@ -192,7 +192,7 @@ from examples import (
 )
 
 # Configuration, modify to values appropriate for your model
-BENCHMARK_PATH = "<target path>mused-fm-nested/"  # Adjust this path to your MUSED-FM data
+BENCHMARK_PATH = "<target path>multits-eval-nested/"  # Adjust this path to your MultiTS-Eval data
 MAX_WINDOWS = 3  # Limit windows per dataset for faster testing
 OUTPUT_DIR = ".<output target path>/<your model name>"
 BATCH_SIZE = 1
@@ -229,8 +229,8 @@ save_submission(results, OUTPUT_DIR, '<your model name>')
 ### Programmatic Usage
 
 ```python
-from musedfm.data import Benchmark
-from musedfm.baselines.base_forecaster import BaseForecaster
+from multieval.data import Benchmark
+from multieval.baselines.base_forecaster import BaseForecaster
 import numpy as np
 from typing import Optional
 
@@ -281,7 +281,7 @@ class MyCustomForecaster(BaseForecaster):
         return forecast
 
 # Load benchmark data
-benchmark = Benchmark("/dev/shm/data/mused-fm-nested")
+benchmark = Benchmark("<PATH TO DATA>/multits-eval-nested")
 
 # Create your custom model
 custom_model = MyCustomForecaster(param1=1.5, param2=2.0)
@@ -322,20 +322,20 @@ for category in benchmark:
 
 ## Example Notebooks
 
-MUSED-FM includes several Jupyter notebooks demonstrating different evaluation approaches:
+MultiTS-Eval includes several Jupyter notebooks demonstrating different evaluation approaches:
 
 ### 1. Baseline Models Evaluation
-**File:** [`notebooks/baseline_models_musedfm_run_eval.ipynb`](notebooks/baseline_models_musedfm_run_eval.ipynb)
+**File:** [`notebooks/baseline_models_multieval_run_eval.ipynb`](notebooks/baseline_models_multieval_run_eval.ipynb)
 
-### 2. Chronos Bolt Model Evaluation (using run_musedfm)
-**File:** [`notebooks/chronos_bolt_musedfm_run_eval.ipynb`](notebooks/chronos_bolt_musedfm_run_eval.ipynb)
+### 2. Chronos Bolt Model Evaluation (using run_multieval)
+**File:** [`notebooks/chronos_bolt_multieval_run_eval.ipynb`](notebooks/chronos_bolt_multieval_run_eval.ipynb)
 
 ### 3. Custom Chronos Evaluation (directly iterating on the dataset)
-**File:** [`notebooks/chronos_bolt_musedfm_custom_eval.ipynb`](notebooks/chronos_bolt_musedfm_custom_eval.ipynb)
+**File:** [`notebooks/chronos_bolt_multieval_custom_eval.ipynb`](notebooks/chronos_bolt_multieval_custom_eval.ipynb)
 
 ---
 
-### run_musedfm Output Directory Structure
+### run_multieval Output Directory Structure
 
 ```
 /tmp/results/
@@ -391,11 +391,11 @@ Submit data as a JSON array with the following format (for each dataset):
 **Notes:**
 - The submission files are automatically generated by the `save_submission()` function
 - Files are saved as `{model_name}_submission.json` in the `submissions/` directory
-- Example files are provided in `src/examples/eval_musedfm` and `src/examples/run_musedfm`
+- Example files are provided in `src/examples/eval_multieval` and `src/examples/run_multieval`
 
 ## Internal Overview
 
-The `mused-fm` client provides iteration and evaluation utilities for the **MUSED-FM multivariate timeseries evaluation dataset**. Users download the dataset from Hugging Face as a `.tar.gz`, extract it, and then interact with it via this package.
+The `multits-eval` iterator provides iteration and evaluation utilities for the **MultiTS-Eval multivariate timeseries evaluation dataset**. Users download the dataset from Hugging Face as a `.tar.gz`, extract it, and then interact with it via this package.
 
 ### Data Structure
 - **Benchmark** → container of multiple categories  
@@ -404,14 +404,14 @@ The `mused-fm` client provides iteration and evaluation utilities for the **MUSE
 - **Dataset** → contains multiple parquet files  
 - **Window** → extracted slices from parquet files  
 
-The breakdown of domains, categories and datasets can be found in `src/musedfm/data/data_hierarchy.json`
+The breakdown of domains, categories and datasets can be found in `src/multits-eval/data/data_hierarchy.json`
 
 ---
 
 ## Directory Layout
 ```
-MUSED-FM/
-├── src/musedfm/              # Core MUSED-FM package
+MultiTS-Eval/
+├── src/multits-eval/              # Core MultiTS-eval package
 │   ├── data/                 # Data handling components
 │   │   ├── window.py         # Individual forecasting windows
 │   │   ├── dataset.py        # Dataset loading and windowing
@@ -433,15 +433,15 @@ MUSED-FM/
 │   └── plotting/             # Visualization utilities
 │       └── plot_forecasts.py
 ├── src/examples/             # Example scripts and utilities
-│   ├── run_musedfm.py        # Main evaluation script
-│   ├── eval_musedfm.py       # Evaluation script with forecast saving
+│   ├── run_multieval.py        # Main evaluation script
+│   ├── eval_multieval.py       # Evaluation script with forecast saving
 │   ├── utils.py              # Utility functions
 │   ├── debug.py              # Debug utilities
 │   └── export_csvs.py        # CSV export utilities
 ├── notebooks/                # Example usage Jupyter notebooks
-│   ├── baseline_models_musedfm_run_eval.ipynb      # Baseline model evaluation
-│   ├── chronos_bolt_musedfm_run_eval.ipynb         # Chronos Bolt model evaluation
-│   └── chronos_bolt_musedfm_custom_eval.ipynb      # Custom Chronos evaluation
+│   ├── baseline_models_multieval_run_eval.ipynb      # Baseline model evaluation
+│   ├── chronos_bolt_multieval_run_eval.ipynb         # Chronos Bolt model evaluation
+│   └── chronos_bolt_multieval_custom_eval.ipynb      # Custom Chronos evaluation
 ├── README.md                 # This file
 ├── pyproject.toml            # Project configuration
 └── setup.py                  # Package setup
@@ -534,7 +534,7 @@ Most baseline models are **univariate** (use only target series). The **Linear R
 
 ## Metrics
 
-Defined in `src/musedfm/metrics.py`:
+Defined in `src/multieval/metrics.py`:
 - **MAPE** - Mean Absolute Percentage Error
 - **MAE** - Mean Absolute Error  
 - **RMSE** - Root Mean Square Error

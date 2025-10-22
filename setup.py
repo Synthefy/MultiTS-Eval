@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="musedfm",
+    name="multieval",
     version="1.0.0",
-    description="MUSED-FM: Multi-Scale Universal Synthetic Data for Forecasting Models",
+    description="MultiTS-Eval: Multivariate Time Series Evaluation Dataset for Foundation Models",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.9",

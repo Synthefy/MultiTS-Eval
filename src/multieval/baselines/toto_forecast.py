@@ -21,7 +21,7 @@ RUN INSTRUCTIONS:
 2. USAGE IN MUSED-FM:
    ```python
    # Programmatic usage
-   from musedfm.baselines.toto_forecast import TotoForecast
+   from multieval.baselines.toto_forecast import TotoForecast
    
    # Initialize ToTo model (will connect to server)
    model = TotoForecast()

@@ -5,8 +5,8 @@ Benchmark class as top-level container for multiple categories.
 import json
 from typing import Iterator, Dict, Any, List, Optional, Union
 from pathlib import Path
-from musedfm.data.category import Category
-from musedfm.data.dataset import Dataset
+from multieval.data.category import Category
+from multieval.data.dataset import Dataset
 from collections import OrderedDict
 
 VERSION = "1.0"

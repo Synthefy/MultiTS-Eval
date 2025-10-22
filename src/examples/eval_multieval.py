@@ -8,9 +8,9 @@ This example shows how to:
 4. Generate visualizations and export results
 
 Usage:
-    python run_musedfm.py --models mean,arima,linear --data-path /path/to/dataset
-    python run_musedfm.py --models all --windows 50
-    python run_musedfm.py --help
+    python run_multieval.py --models mean,arima,linear --data-path /path/to/dataset
+    python run_multieval.py --models all --windows 50
+    python run_multieval.py --help
 """
 
 import time
@@ -22,8 +22,8 @@ import argparse
 import copy
 import pandas as pd
 from tqdm import tqdm
-from musedfm.data import Benchmark
-from musedfm.plotting import plot_window_forecasts
+from multieval.data import Benchmark
+from multieval.plotting import plot_window_forecasts
 
 # Import utility and debug functions
 from examples.utils import (
@@ -420,11 +420,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_musedfm.py --models mean,arima --benchmark-path /path/to/benchmark
-  python run_musedfm.py --models all --windows 50 --plots --csv
-  python run_musedfm.py --models linear_trend,exponential_smoothing --windows 20
-  python run_musedfm.py --models all --categories Traditional --domains Energy
-  python run_musedfm.py --models mean --datasets al_daily,bitcoin_price --plots
+  python run_multieval.py --models mean,arima --benchmark-path /path/to/benchmark
+  python run_multieval.py --models all --windows 50 --plots --csv
+  python run_multieval.py --models linear_trend,exponential_smoothing --windows 20
+  python run_multieval.py --models all --categories Traditional --domains Energy
+  python run_multieval.py --models mean --datasets al_daily,bitcoin_price --plots
         """
     )
     
@@ -438,7 +438,7 @@ Examples:
     parser.add_argument(
         "--benchmark-path",
         type=str,
-        default="/home/caleb/musedfm_data",
+        default="/home/caleb/multieval_data",
         help="Path to the benchmark directory containing categories"
     )
     

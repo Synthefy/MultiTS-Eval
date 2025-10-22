@@ -28,15 +28,15 @@ def get_available_models(device: str = "cuda:0", use_additional_models: bool = F
     Args:
         device: Device to use for models that support it (e.g., "cuda:0", "cpu")
     """
-    from musedfm.baselines import (
+    from multieval.baselines import (
         MeanForecast, 
         HistoricalInertia, 
         ARIMAForecast, 
         LinearTrend, 
         ExponentialSmoothing
     )
-    from musedfm.baselines.linear_regression import LinearRegressionForecast
-    from musedfm.baselines.chronos_forecast import ChronosForecast
+    from multieval.baselines.linear_regression import LinearRegressionForecast
+    from multieval.baselines.chronos_forecast import ChronosForecast
     
     models = {
         "mean": {"model": MeanForecast(), "univariate": True},
@@ -51,13 +51,13 @@ def get_available_models(device: str = "cuda:0", use_additional_models: bool = F
         # "another_model": {"model": AnotherModel(param1=value1, param2=value2), "univariate": True}
     }
     if use_additional_models:
-        from musedfm.baselines.moirai_forecast import MoiraiForecast
-        from musedfm.baselines.toto_forecast import TotoForecast
+        from multieval.baselines.moirai_forecast import MoiraiForecast
+        from multieval.baselines.toto_forecast import TotoForecast
         models.update({
             "moirai": {"model": MoiraiForecast(device=device), "univariate": True},
             "toto": {"model": TotoForecast(), "univariate": False}
         })
-        from musedfm.baselines.timesfm_forecast import TimesFMForecast
+        from multieval.baselines.timesfm_forecast import TimesFMForecast
         models.update({
             "timesfm": {"model": TimesFMForecast(device=device), "univariate": False}
         })

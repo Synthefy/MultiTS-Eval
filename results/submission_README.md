@@ -1,6 +1,6 @@
-# MUSED-FM Submission Results
+# MultiTS-Eval Submission Results
 
-This directory contains submission results for the MUSED-FM multivariate time series forecasting benchmark. Each submission includes model metadata and evaluation results across multiple domains and datasets.
+This directory contains submission results for the MultiTS-Eval multivariate time series forecasting benchmark. Each submission includes model metadata and evaluation results across multiple domains and datasets.
 
 ## Submission Structure
 

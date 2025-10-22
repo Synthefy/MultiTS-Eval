@@ -9,10 +9,10 @@ This example shows how to:
 5. Use parallel processing for faster execution
 
 Usage:
-    python run_musedfm_parallel.py --models mean,arima,linear --data-path /path/to/dataset
-    python run_musedfm_parallel.py --models all --windows 50
-    python run_musedfm_parallel.py --models all --num-processes 4
-    python run_musedfm_parallel.py --help
+    python run_multieval_parallel.py --models mean,arima,linear --data-path /path/to/dataset
+    python run_multieval_parallel.py --models all --windows 50
+    python run_multieval_parallel.py --models all --num-processes 4
+    python run_multieval_parallel.py --help
 """
 
 import time
@@ -35,8 +35,8 @@ os.environ['PYTHONWARNINGS'] = 'ignore'
 # Set warnings to ignore at the module level
 warnings.simplefilter("ignore")
 
-from musedfm.data import Benchmark
-from musedfm.plotting import plot_window_forecasts
+from multieval.data import Benchmark
+from multieval.plotting import plot_window_forecasts
 
 # Import utility and debug functions
 from examples.utils import (
@@ -54,7 +54,7 @@ from examples.debug import (
 from examples.export_csvs import (
     export_hierarchical_results_to_csv
 )
-from examples.eval_musedfm import (
+from examples.eval_multieval import (
     SaveManager
 )
 
@@ -435,7 +435,7 @@ def run_models_parallel(benchmark_path: str, models: dict, max_windows: int = 10
                         
                         # Special handling for ChronosForecast to pass device parameter
                         if model_name == 'chronos':
-                            from musedfm.baselines.chronos_forecast import ChronosForecast
+                            from multieval.baselines.chronos_forecast import ChronosForecast
                             device = "cpu" if cpu_only else "cuda:0"
                             slice_models[model_name] = {
                                 'model': ChronosForecast(device=device),
@@ -713,13 +713,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_musedfm_parallel.py --models mean,arima --benchmark-path /path/to/benchmark
-  python run_musedfm_parallel.py --models all --windows 50 --plots
-  python run_musedfm_parallel.py --models linear_trend,exponential_smoothing --windows 20
-  python run_musedfm_parallel.py --models all --categories Traditional --domains Energy
-  python run_musedfm_parallel.py --models mean --datasets al_daily,bitcoin_price --plots
-  python run_musedfm_parallel.py --models all --num-processes 4
-  python run_musedfm_parallel.py --models mean,arima --windows 100 --num-processes 2
+  python run_multieval_parallel.py --models mean,arima --benchmark-path /path/to/benchmark
+  python run_multieval_parallel.py --models all --windows 50 --plots
+  python run_multieval_parallel.py --models linear_trend,exponential_smoothing --windows 20
+  python run_multieval_parallel.py --models all --categories Traditional --domains Energy
+  python run_multieval_parallel.py --models mean --datasets al_daily,bitcoin_price --plots
+  python run_multieval_parallel.py --models all --num-processes 4
+  python run_multieval_parallel.py --models mean,arima --windows 100 --num-processes 2
         """
     )
     
@@ -733,7 +733,7 @@ Examples:
     parser.add_argument(
         "--benchmark-path",
         type=str,
-        default="/home/caleb/musedfm_data",
+        default="/home/caleb/multieval_data",
         help="Path to the benchmark directory containing categories"
     )
     

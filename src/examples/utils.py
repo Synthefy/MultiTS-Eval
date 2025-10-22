@@ -1,5 +1,5 @@
 """
-Utility functions for MUSED-FM examples.
+Utility functions for MultiTS-Eval examples.
 
 This module contains helper functions for:
 - Model parsing and configuration

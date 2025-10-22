@@ -1,7 +1,7 @@
 """
-Save submission file in the required format for MUSED-FM competition.
+Save submission file in the required format for MultiTS-Eval competition.
 
-This module provides functionality to convert results from MUSED-FM evaluation
+This module provides functionality to convert results from MultiTS-Eval evaluation
 into the submission format required by the competition.
 """
 
@@ -9,17 +9,17 @@ import json
 import os
 from typing import Dict, List, Any, Optional
 from pathlib import Path
-from musedfm.data.benchmark import VERSION
+from multieval.data.benchmark import VERSION
 import numpy as np
 
 
 def save_submission(results: Dict[str, Any], output_dir: str, model_name: Optional[str] = None) -> None:
     """
-    Save results in the submission format required by MUSED-FM competition.
+    Save results in the submission format required by MultiTS-Eval competition.
     Creates separate JSON files for each model.
     
     Args:
-        results: Results dictionary from MUSED-FM evaluation containing metrics
+        results: Results dictionary from MultiTS-Eval evaluation containing metrics
         output_dir: Directory where to save the submission JSON files
         model_name: Optional specific model name to save (if None, saves all models)
         
@@ -39,7 +39,7 @@ def save_submission(results: Dict[str, Any], output_dir: str, model_name: Option
     """
     
     # Load the data hierarchy to get domain and category mappings
-    hierarchy_path = Path(__file__).parent.parent / "musedfm" / "data" / "data_hierarchy.json"
+    hierarchy_path = Path(__file__).parent.parent / "multieval" / "data" / "data_hierarchy.json"
     with open(hierarchy_path, 'r') as f:
         data_hierarchy = json.load(f)
     
@@ -66,6 +66,13 @@ def save_submission(results: Dict[str, Any], output_dir: str, model_name: Option
     # Process each model
     for current_model_name in models_to_process:
         model_results = results[current_model_name]
+        
+        # Handle case where model_results might be a list instead of dict
+        if isinstance(model_results, list):
+            print(f"Warning: model_results for {current_model_name} is a list, not a dict.")
+            print(f"This suggests the results structure was modified incorrectly.")
+            print(f"Skipping this model. Please check your notebook execution.")
+            continue
         
         # Convert to submission format
         submission_data = []
@@ -141,7 +148,7 @@ def create_sample_submission(output_path: str) -> None:
     """
     
     # Load the data hierarchy to get all datasets
-    hierarchy_path = Path(__file__).parent.parent / "musedfm" / "data" / "data_hierarchy.json"
+    hierarchy_path = Path(__file__).parent.parent / "multieval" / "data" / "data_hierarchy.json"
     with open(hierarchy_path, 'r') as f:
         data_hierarchy = json.load(f)
     
@@ -190,7 +197,7 @@ def main():
     """Example usage of the save_submission functions."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Save MUSED-FM submission file")
+    parser = argparse.ArgumentParser(description="Save MultiTS-Eval submission file")
     parser.add_argument("--results", type=str, help="Path to results JSON file")
     parser.add_argument("--output", type=str, required=True, help="Output directory for submission files")
     parser.add_argument("--model", type=str, help="Model name to use from results")

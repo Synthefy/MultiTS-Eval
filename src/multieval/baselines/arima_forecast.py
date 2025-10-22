@@ -4,7 +4,7 @@ ARIMA forecast baseline for MUSED-FM evaluation.
 
 import numpy as np
 from typing import Optional
-from musedfm.baselines.base_forecaster import BaseForecaster
+from multieval.baselines.base_forecaster import BaseForecaster
 
 
 class ARIMAForecast(BaseForecaster):

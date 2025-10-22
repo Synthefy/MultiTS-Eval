@@ -1,10 +1,10 @@
 """
-MUSED-FM Examples Package
+MultiTS-Eval Examples Package
 
-This package contains example scripts and utilities for running MUSED-FM benchmarks.
+This package contains example scripts and utilities for running MultiTS-Eval benchmarks.
 """
 
-from examples.run_musedfm import (
+from examples.run_multieval import (
     run_models_on_benchmark,
     compare_model_performance,
     generate_forecast_plots

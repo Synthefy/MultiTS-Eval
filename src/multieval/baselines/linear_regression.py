@@ -155,6 +155,22 @@ class LinearRegressionForecast:
                     forecast_i.append(pred)
                 
                 forecast_i = np.array(forecast_i)
+                
+                # Clip extreme predictions that are more than 10x the historical range
+                history_range = np.max(history[i]) - np.min(history[i])
+                if history_range > 0:  # Only clip if there's actual variation
+                    max_allowed = np.max(history[i]) + 10 * history_range
+                    min_allowed = np.min(history[i]) - 10 * history_range
+                    
+                    # Check if clipping is needed
+                    if np.any(forecast_i > max_allowed) or np.any(forecast_i < min_allowed):
+                        print("Warning: Linear regression forecast contains extreme values, clipping to historical range ±10x")
+                        print(f"  Historical range: [{np.min(history[i]):.2e}, {np.max(history[i]):.2e}]")
+                        print(f"  Forecast range before clipping: [{np.min(forecast_i):.2e}, {np.max(forecast_i):.2e}]")
+                        
+                        forecast_i = np.clip(forecast_i, min_allowed, max_allowed)
+                        
+                        print(f"  Forecast range after clipping: [{np.min(forecast_i):.2e}, {np.max(forecast_i):.2e}]")
             
             forecasts.append(forecast_i)
         

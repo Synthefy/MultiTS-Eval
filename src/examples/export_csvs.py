@@ -1,5 +1,5 @@
 """
-CSV export functionality for MUSED-FM examples.
+CSV export functionality for MultiTS-Eval examples.
 
 This module contains functions for:
 - Exporting results to CSV files
@@ -12,7 +12,7 @@ import glob
 import pandas as pd
 from pathlib import Path
 from typing import Optional
-from musedfm.data import Benchmark
+from multieval.data import Benchmark
 
 
 def _clean_output_directories(output_dir: str) -> None:
