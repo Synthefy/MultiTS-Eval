@@ -61,9 +61,9 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
             extreme_constant = mape_constant > 1000
             if np.any(extreme_constant):
                 extreme_indices = np.where(constant_mask)[0][extreme_constant]
-                print(f"EXTREME MAPE in constant cases - indices: {extreme_indices}, values: {mape_constant[extreme_constant]}")
-                print(f"  normalization factors: {normalization_factor[extreme_constant]}")
-                print(f"  MAE values: {mae_low_var[constant_mask][extreme_constant]}")
+                # print(f"EXTREME MAPE in constant cases - indices: {extreme_indices}, values: {mape_constant[extreme_constant]}")
+                # print(f"  normalization factors: {normalization_factor[extreme_constant]}")
+                # print(f"  MAE values: {mae_low_var[constant_mask][extreme_constant]}")
         
         # Low variance but not constant case
         low_var_not_constant_mask = low_variance_mask & (target_range >= LOW_VARIANCE_THRESHOLD)
@@ -77,9 +77,9 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
             extreme_low_var = mape_low_var > 1000
             if np.any(extreme_low_var):
                 extreme_indices = np.where(low_var_not_constant_mask)[0][extreme_low_var]
-                print(f"EXTREME MAPE in low variance cases - indices: {extreme_indices}, values: {mape_low_var[extreme_low_var]}")
-                print(f"  normalization factors: {normalization_factor[extreme_low_var]}")
-                print(f"  MAE values: {mae_low_var[low_var_not_constant_mask][extreme_low_var]}")
+                # print(f"EXTREME MAPE in low variance cases - indices: {extreme_indices}, values: {mape_low_var[extreme_low_var]}")
+                # print(f"  normalization factors: {normalization_factor[extreme_low_var]}")
+                # print(f"  MAE values: {mae_low_var[low_var_not_constant_mask][extreme_low_var]}")
     
     # Handle normal cases (target_std >= 1e-3)
     normal_mask = target_std >= LOW_VARIANCE_THRESHOLD
@@ -109,13 +109,13 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
                 mape_normal[i] = np.nanmean(mape_values, where=batch_combined_mask)
                 
                 # Check for extreme values
-                if mape_normal[i] > 1000:
-                    print(f"EXTREME MAPE in normal case - batch {batch_idx}: {mape_normal[i]:.2f}")
-                    print(f"  y_true range: [{np.nanmin(y_true_batch):.2e}, {np.nanmax(y_true_batch):.2e}]")
-                    print(f"  y_pred range: [{np.nanmin(y_pred_batch):.2e}, {np.nanmax(y_pred_batch):.2e}]")
-                    print(f"  denominator range: [{np.nanmin(denominator):.2e}, {np.nanmax(denominator):.2e}]")
-                    print(f"  min_threshold: {min_threshold[i]:.2e}")
-                    print(f"  raw MAPE range: [{np.nanmin(mape_values):.2e}, {np.nanmax(mape_values):.2e}]")
+                # if mape_normal[i] > 1000:
+                #     print(f"EXTREME MAPE in normal case - batch {batch_idx}: {mape_normal[i]:.2f}")
+                #     print(f"  y_true range: [{np.nanmin(y_true_batch):.2e}, {np.nanmax(y_true_batch):.2e}]")
+                #     print(f"  y_pred range: [{np.nanmin(y_pred_batch):.2e}, {np.nanmax(y_pred_batch):.2e}]")
+                #     print(f"  denominator range: [{np.nanmin(denominator):.2e}, {np.nanmax(denominator):.2e}]")
+                #     print(f"  min_threshold: {min_threshold[i]:.2e}")
+                #     print(f"  raw MAPE range: [{np.nanmin(mape_values):.2e}, {np.nanmax(mape_values):.2e}]")
         
         # Handle cases where all values are too small
         small_values_mask = normal_mask & ~np.any(threshold_mask & valid_mask, axis=1)
@@ -130,9 +130,9 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
             extreme_small = mape_small > 1000
             if np.any(extreme_small):
                 extreme_indices = np.where(small_values_mask)[0][extreme_small]
-                print(f"EXTREME MAPE in small values cases - indices: {extreme_indices}, values: {mape_small[extreme_small]}")
-                print(f"  normalization factors: {normalization_factor[extreme_small]}")
-                print(f"  MAE values: {mae_small[small_values_mask][extreme_small]}")
+                # print(f"EXTREME MAPE in small values cases - indices: {extreme_indices}, values: {mape_small[extreme_small]}")
+                # print(f"  normalization factors: {normalization_factor[extreme_small]}")
+                # print(f"  MAE values: {mae_small[small_values_mask][extreme_small]}")
         
         # Set normal case MAPE values
         normal_with_data_mask = normal_mask & ~small_values_mask
@@ -143,10 +143,10 @@ def MAPE(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     # Check for extreme values in final results
     extreme_count = np.sum(mape_per_batch > 1000)
     if extreme_count > 0:
-        print(f"SUMMARY: {extreme_count} extreme MAPE values (>1000%) detected!")
+        # print(f"SUMMARY: {extreme_count} extreme MAPE values (>1000%) detected!")
         extreme_indices = np.where(mape_per_batch > 1000)[0]
-        print(f"Extreme MAPE indices: {extreme_indices}")
-        print(f"Extreme MAPE values: {mape_per_batch[extreme_indices]}")
+        # print(f"Extreme MAPE indices: {extreme_indices}")
+        # print(f"Extreme MAPE values: {mape_per_batch[extreme_indices]}")
     
     return mape_per_batch
 

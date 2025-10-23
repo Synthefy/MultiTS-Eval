@@ -164,13 +164,13 @@ class LinearRegressionForecast:
                     
                     # Check if clipping is needed
                     if np.any(forecast_i > max_allowed) or np.any(forecast_i < min_allowed):
-                        print("Warning: Linear regression forecast contains extreme values, clipping to historical range ±10x")
-                        print(f"  Historical range: [{np.min(history[i]):.2e}, {np.max(history[i]):.2e}]")
-                        print(f"  Forecast range before clipping: [{np.min(forecast_i):.2e}, {np.max(forecast_i):.2e}]")
+                        # print("Warning: Linear regression forecast contains extreme values, clipping to historical range ±10x")
+                        # print(f"  Historical range: [{np.min(history[i]):.2e}, {np.max(history[i]):.2e}]")
+                        # print(f"  Forecast range before clipping: [{np.min(forecast_i):.2e}, {np.max(forecast_i):.2e}]")
                         
                         forecast_i = np.clip(forecast_i, min_allowed, max_allowed)
                         
-                        print(f"  Forecast range after clipping: [{np.min(forecast_i):.2e}, {np.max(forecast_i):.2e}]")
+                        # print(f"  Forecast range after clipping: [{np.min(forecast_i):.2e}, {np.max(forecast_i):.2e}]")
             
             forecasts.append(forecast_i)
         

@@ -1,10 +1,12 @@
 # MultiTS-Eval: Multivariate Time Series Evaluation Dataset for Foundation Models
 
-A multivariate-first foundation model evaluation dataset that focuses on identifying a model's ability to leverage other useful time series for forecasting a single target time series. This codebase provides tooling and APIs for iterating through and evaluating metrics on the dataset, performing both univariate (just the target) and multivariate forecasting, and stratifying results according to different types of data according to different levels of complexity. 
+A multivariate-first foundation model evaluation dataset that focuses on identifying a model's ability to leverage other useful time series for forecasting a single target time series. This codebase provides tooling and APIs for iterating through and evaluating metrics on the dataset, performing both univariate (just the target) and multivariate forecasting, and stratifying results according to each dataset, different domains (ex. energy, web, etc.) and different categories (synthetic, traditional, etc.).
 
-## Usage
+# Usage
 
 ## Getting and Setting Up the Data:
+**Install git-lfs if not preset**
+Follow installation instructions here: [git-lfs](https://github.com/git-lfs/git-lfs?utm_source=gitlfs_site&utm_medium=installation_link&utm_campaign=gitlfs#installing)
 
 **Clone the dataset repo (requires git-lfs, ~100GB):**
 ```bash
@@ -150,6 +152,7 @@ class MyCustomModel(BaseForecaster):
             history: Historical time series data (shape: [batch_size, time_steps])
             covariates: Optional covariate data (shape: [batch_size, time_steps, covariate_features])
             forecast_horizon: Number of future points to forecast
+            timestamps: Timestamps for full window
             
         Returns:
             Forecast values (shape: [forecast_horizon, features])
@@ -166,7 +169,7 @@ class MyCustomModel(BaseForecaster):
 ```
 
 
-### Modify model_handling with your custom model
+### Usage pattern 1: Modify model_handling with your custom model
 
 Instead of modifying the `run_multieval.py` file, you can use the evaluation functions directly with your custom models by updating the models file in examples/model_handling.py:
 
@@ -178,8 +181,13 @@ def get_custom_models():
     }
 ```
 
-### use functions from run_multieval.py
-Using the function from run_multieval can give more fine-grain control, especially if you intend to change the data iteration pipeline.
+Then simply run 
+```bash
+uv run src/examples/run_multieval.py --benchmark-path <YOUR PATH>/multits-eval-nested --models <MY_MODEL> --load-cached-counts --output-dir <your output path>/multits-eval-outputs/ --debug-mode --stride 512 --batch-size 32
+```
+
+### Usage Pattern 2: Use functions from run_multieval.py
+Using the function from run_multieval can give more fine-grain control, especially if you intend to change how the results are used or visualized.
 
 ```python
 # Import functions from the examples package
@@ -226,59 +234,14 @@ save_submission(results, OUTPUT_DIR, '<your model name>')
 
 ```
 
-### Programmatic Usage
+### Usage 3: Programmatic Usage
+Directly iterate on the dataset, which is especially useful when you want fine-grained manipulation of the data. 
 
 ```python
 from multieval.data import Benchmark
 from multieval.baselines.base_forecaster import BaseForecaster
 import numpy as np
 from typing import Optional
-
-# Template for creating custom forecasting models
-class MyCustomForecaster(BaseForecaster):
-    """
-    Template for creating custom forecasting models.
-    Inherit from BaseForecaster and implement the forecast method.
-    """
-    
-    def __init__(self, param1=1.0, param2=2.0):
-        """
-        Initialize your custom model with any parameters.
-        
-        Args:
-            param1: First parameter for your model
-            param2: Second parameter for your model
-        """
-        self.param1 = param1
-        self.param2 = param2
-    
-    def forecast(self, history: np.ndarray, covariates: Optional[np.ndarray] = None, 
-                forecast_horizon: Optional[int] = None) -> np.ndarray:
-        """
-        Generate forecast from historical data.
-        
-        Args:
-            history: Historical time series data (shape: [time_steps, features])
-            covariates: Optional covariate data (shape: [time_steps, covariate_features])
-            forecast_horizon: Number of future points to forecast
-            
-        Returns:
-            Forecast values (shape: [forecast_horizon, features])
-        """
-        if forecast_horizon is None:
-            forecast_horizon = 1
-        
-        # Example: Simple moving average with custom parameters
-        # Replace this with your actual forecasting logic
-        if len(history.shape) == 1:
-            # Univariate case
-            forecast = np.full(forecast_horizon, np.mean(history) * self.param1)
-        else:
-            # Multivariate case
-            forecast = np.full((forecast_horizon, history.shape[1]), 
-                             np.mean(history, axis=0) * self.param1)
-        
-        return forecast
 
 # Load benchmark data
 benchmark = Benchmark("<PATH TO DATA>/multits-eval-nested")
@@ -302,11 +265,11 @@ for category in benchmark:
                 forecast = custom_model.forecast(
                     window.history(), 
                     window.covariates(), 
-                    len(window.target())
+                    len(window.target()),
                     window.timestamps()
                 )
                 
-                # Submit forecast for evaluation
+                # Submit forecast for evaluation (automatically runs evaluation code)
                 # Set univariate=True if your model only uses target series
                 # Set univariate=False if your model uses covariates
                 window.submit_forecast(forecast, univariate=True)
@@ -347,7 +310,7 @@ MultiTS-Eval includes several Jupyter notebooks demonstrating different evaluati
 │   └── arima_forecasts.png
 ├── submissions/                   # Competition submission files
 │   ├── YOUR_MODEL_submission.json
-│   ├── YOUR_SECOND_MODEL_submission.json
+│   ├── YOUR_SECOND_MODEL_submission.json # (if you have multiple submissions)
 │   └── ...
 └── debug/                         # Debug information (if --debug-mode)
     ├── high_mape_windows.png
@@ -356,7 +319,7 @@ MultiTS-Eval includes several Jupyter notebooks demonstrating different evaluati
 
 # Make a submission
 
-Submit data as a JSON array with the following format (for each dataset):
+Submit data as a JSON array containing entries for each dataset with the following format:
 
 ```json
 [
@@ -389,7 +352,7 @@ Submit data as a JSON array with the following format (for each dataset):
   - `NMAE`: Normalized Mean Absolute Error
 
 **Notes:**
-- The submission files are automatically generated by the `save_submission()` function
+- The submission files are automatically generated by the `save_submission()` function (called by run_multieval.py)
 - Files are saved as `{model_name}_submission.json` in the `submissions/` directory
 - Example files are provided in `src/examples/eval_multieval` and `src/examples/run_multieval`
 
@@ -437,6 +400,7 @@ MultiTS-Eval/
 │   ├── eval_multieval.py       # Evaluation script with forecast saving
 │   ├── utils.py              # Utility functions
 │   ├── debug.py              # Debug utilities
+│   ├── save_submission.py    # Saves out putputs in submission format
 │   └── export_csvs.py        # CSV export utilities
 ├── notebooks/                # Example usage Jupyter notebooks
 │   ├── baseline_models_multieval_run_eval.ipynb      # Baseline model evaluation
@@ -470,6 +434,7 @@ MultiTS-Eval/
 ### 2. Dataset
 - **Collection of windows** (parsed from parquet files).
 - Handles data cleaning, NaN removal, and column validation.
+- Handles batching for faster iteration
 - Iterable: `for window in dataset`
 
 **Methods**
@@ -506,7 +471,7 @@ MultiTS-Eval/
 
 ### 5. Benchmark
 - **Top-level container for multiple categories**.
-- Simple orchestrator for evaluations and exports.
+- Simple orchestrator for evaluations.
 
 **Methods**
 - `__iter__() -> Iterator[Category]`
@@ -521,14 +486,17 @@ MultiTS-Eval/
 
 The framework includes several baseline forecasting methods:
 
-1. **Mean Forecast** (`MeanForecast`) - Forecasts the mean of historical data
-2. **Historical Inertia** (`HistoricalInertia`) - Uses the last observed value
-3. **Linear Trend** (`LinearTrend`) - Linear trend extrapolation
-4. **Exponential Smoothing** (`ExponentialSmoothing`) - Simple exponential smoothing
-5. **ARIMA** (`ARIMAForecast`) - AutoRegressive Integrated Moving Average model
-6. **Linear Regression** (`LinearRegressionForecast`) - Linear regression with univariate/multivariate capabilities
+1. **Mean Forecast** (`mean`) - Forecasts the mean of historical data
+2. **Historical Inertia** (`historical_inertia`) - Uses the last observed value
+3. **Linear Trend** (`linear_trend`) - Linear trend extrapolation
+4. **Exponential Smoothing** (`exponential_smoothing`) - Simple exponential smoothing
+5. **ARIMA** (`arima`) - AutoRegressive Integrated Moving Average model
+6. **Linear Regression** (`linear_regression`) - Linear regression with univariate/multivariate capabilities
+7. **Chronos Bolt** (`chronos`) - [Chronos bolt](https://github.com/amazon-science/chronos-forecasting) by Amazon, a TSFM.
 
 Most baseline models are **univariate** (use only target series). The **Linear Regression** model can operate in both univariate and multivariate modes.
+
+Additional models ([toto](https://github.com/DataDog/toto), [timesfm](https://github.com/google-research/timesfm/), [moirai](https://github.com/redoules/moirai)) are supported but require additional install.
 
 ---
 

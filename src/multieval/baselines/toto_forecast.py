@@ -36,7 +36,7 @@ import numpy as np
 import requests
 import os
 from typing import Optional, Dict, Any
-from .utils import handle_nans, standard_normalize
+from .utils import handle_nans, standard_normalize, standard_denormalize
 
 class TotoForecast:
     """
@@ -88,9 +88,9 @@ class TotoForecast:
                 # If all conversion fails, skip validation
                 return
         
-        time_deltas = np.diff(timestamps_numeric)
-        if not np.allclose(time_deltas, time_deltas[0]):
-            print(f"Warning: ToTo assumes evenly spaced timestamps. Found varying time deltas: {time_deltas}")
+        # time_deltas = np.diff(timestamps_numeric)
+        # if not np.allclose(time_deltas, time_deltas[0]):
+        #     print(f"Warning: ToTo assumes evenly spaced timestamps. Found varying time deltas: {time_deltas}, timestamps: {timestamps}")
     
     def _convert_timestamps_to_seconds(self, timestamps: np.ndarray) -> np.ndarray:
         """Convert timestamps to seconds since epoch."""
@@ -287,4 +287,6 @@ class TotoForecast:
                 padding = np.tile(last_values, (1, padding_length))
                 forecasts = np.concatenate([forecasts, padding], axis=1)
         
+        # Denormalize
+        forecasts = standard_denormalize(forecasts, history_mean, history_std)
         return forecasts
