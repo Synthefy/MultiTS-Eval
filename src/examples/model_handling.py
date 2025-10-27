@@ -37,6 +37,7 @@ def get_available_models(device: str = "cuda:0", use_additional_models: bool = F
     )
     from multieval.baselines.linear_regression import LinearRegressionForecast
     from multieval.baselines.chronos_forecast import ChronosForecast
+    from multieval.chronos2_forecast import Chronos2Forecast
     
     models = {
         "mean": {"model": MeanForecast(), "univariate": True},
@@ -49,6 +50,7 @@ def get_available_models(device: str = "cuda:0", use_additional_models: bool = F
         # Add your custom models here:
         # "my_custom": {"model": MyCustomModel(), "univariate": False},
         # "another_model": {"model": AnotherModel(param1=value1, param2=value2), "univariate": True}
+        "chronos2": {"model": Chronos2Forecast(device=device), "univariate": True},
     }
     if use_additional_models:
         from multieval.baselines.moirai_forecast import MoiraiForecast

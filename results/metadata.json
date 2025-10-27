@@ -1,0 +1,10 @@
+{
+    "model": "Chronos2",
+    "submitter": "Amazon",
+    "submission_date": "2025-10-27",
+    "task": "univariate_forecasting",
+    "dataset_version": "v1.0",
+    "paper_url": "https://arxiv.org/abs/2510.15821",
+    "code_url": "https://github.com/amazon-science/chronos-forecasting?tab=readme-ov-file",
+    "description": "Pretrained time series forecasting model that offers zero-shot support for univariate, multivariate, and covariate-informed forecasting tasks."
+}
