@@ -762,8 +762,8 @@ Examples:
     parser.add_argument(
         "--stride",
         type=int,
-        default=256,
-        help="Stride between windows (default: 256)"
+        default=512,
+        help="Stride between windows (default: 512)"
     )
     
     parser.add_argument(

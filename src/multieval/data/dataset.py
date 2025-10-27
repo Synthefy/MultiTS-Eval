@@ -397,11 +397,11 @@ class Dataset:
             df = pd.read_parquet(parquet_file)
         data_length = len(df)
         
-        # Minimum history length for forecasting (prioritize forecasting after 20 values)
-        MIN_HISTORY_FORECAST_LENGTH = 20
+        # Minimum history length for forecasting (prioritize forecasting after 15 values)
+        MIN_HISTORY_FORECAST_LENGTH = 15
         min_history_for_forecast = min(MIN_HISTORY_FORECAST_LENGTH, self.history_length)
         
-        # Minimum total data required: 20 history + 20 forecast = 40 points
+        # Minimum total data required: 15 history + 15 forecast = 30 points
         min_total_data = MIN_HISTORY_FORECAST_LENGTH * 2
         
         # Check if dataset has minimum required data
@@ -440,6 +440,7 @@ class Dataset:
             for parquet_file in self._parquet_files:
                 windows_count = self._count_windows_in_file(parquet_file)
                 self._total_windows += windows_count
+
         else:
             # Estimate by sampling first 100 files using custom counter
             print(f"Large dataset {self.dataset_name} detected ({num_files} files). Estimating window count by sampling first 100 files...")
@@ -659,16 +660,16 @@ class Dataset:
         """Create windows with stride parameter and handle incomplete windows."""
         data_length = len(target_series)
         
-        # Minimum history length for forecasting (prioritize forecasting after 20 values)
-        MIN_HISTORY_FORECAST_LENGTH = 20
+        # Minimum history length for forecasting (prioritize forecasting after 15 values)
+        MIN_HISTORY_FORECAST_LENGTH = 15
         min_history_for_forecast = min(MIN_HISTORY_FORECAST_LENGTH, self.history_length)
         
-        # Minimum total data required: 20 history + 20 forecast = 40 points
+        # Minimum total data required: 15 history + 15 forecast = 30 points
         min_total_data = MIN_HISTORY_FORECAST_LENGTH * 2
         
         # Check if dataset has minimum required data
         if data_length < min_total_data:
-            # Dataset is too short for any meaningful forecasting (need at least 40 points)
+            # Dataset is too short for any meaningful forecasting (need at least 30 points)
             return []
         
         # Calculate the maximum start index
@@ -742,6 +743,7 @@ class Dataset:
                 windows.append(window)
                 
             elif available_data >= MIN_HISTORY_FORECAST_LENGTH * 2:
+
                 # Split available data equally between history and forecast, but limit target to forecast_horizon
                 actual_history_length = available_data // 2
                 history_end = start_idx + actual_history_length

@@ -19,10 +19,10 @@ git clone git@hf.co:datasets/Synthefy/MultiTS-Eval ./multits-eval-data
 mkdir -p <your target folder>/multits-eval-nested/{collections,traditional,sequential,synthetic}
 
 # Extract archives to shared memory
-tar -xzf ./multits-eval-data/collections.tar.gz -C <your target folder>/multits-eval-nested &
-tar -xzf ./multits-eval-data/traditional.tar.gz -C <your target folder>/multits-eval-nested/traditional &
-tar -xzf ./multits-eval-data/sequential.tar.gz -C <your target folder>/multits-eval-nested/sequential &
-tar -xzf ./multits-eval-data/synthetic.tar.gz -C <your target folder>/multits-eval-nested/synthetic &
+tar -xzf ./multits-eval-data/compressed_data/collections.tar.gz -C <your target folder>/multits-eval-nested/collections &
+tar -xzf ./multits-eval-data/compressed_data/traditional.tar.gz -C <your target folder>/multits-eval-nested/traditional &
+tar -xzf ./multits-eval-data/compressed_data/sequential.tar.gz -C <your target folder>/multits-eval-nested/sequential &
+tar -xzf ./multits-eval-data/compressed_data/synthetic.tar.gz -C <your target folder>/multits-eval-nested/synthetic &
 ```
 
 ---
@@ -125,7 +125,7 @@ Both scripts support the following common arguments:
 
 ## Adding Custom Models
 
-The above commands will only run the existing baselines. To use the tools in this repo to add your own model, you first need to create a model class with the desired features. Then using an instance of that class, there are three ways to add a new model, which we discuss below:
+The above commands will only run the existing baselines. The dataset uses NaN padding for missing values, which should be handled by the custom model file. To use the tools in this repo to add your own model, you first need to create a model class with the desired features. Then using an instance of that class, there are three ways to add a new model, which we discuss below:
 - Add your model to the model_handling.py file
 - Utilize the functions in run_multieval.py to evaluate your model
 - Use the iterator to iterate through the dataset directly
