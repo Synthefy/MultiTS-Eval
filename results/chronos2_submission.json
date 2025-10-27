@@ -18,11 +18,11 @@
     "dataset": "wikipedia",
     "dataset_version": "v1.0",
     "metrics": {
-      "MAE": NaN,
-      "RMSE": NaN,
-      "Multi-MAPE": NaN,
-      "Uni-MAPE": NaN,
-      "NMAE": NaN
+      "MAE": 893.5057643856179,
+      "RMSE": 2275.882960107036,
+      "Multi-MAPE": 329.22538704154454,
+      "Uni-MAPE": 329.22538704154454,
+      "NMAE": 0.8514099083881294
     }
   },
   {
@@ -928,11 +928,11 @@
     "dataset": "cursor-tabs",
     "dataset_version": "v1.0",
     "metrics": {
-      "MAE": NaN,
-      "RMSE": NaN,
-      "Multi-MAPE": NaN,
-      "Uni-MAPE": NaN,
-      "NMAE": NaN
+      "MAE": 26.414266462648023,
+      "RMSE": 32.21685280504023,
+      "Multi-MAPE": 531.7296000724648,
+      "Uni-MAPE": 531.7296000724648,
+      "NMAE": 1.3115133780579287
     }
   },
   {
