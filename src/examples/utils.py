@@ -1,5 +1,5 @@
 """
-Utility functions for MultiTS-Eval examples.
+Utility functions for MUSEval examples.
 
 This module contains helper functions for:
 - Model parsing and configuration

@@ -1,5 +1,5 @@
 """
-Compute metrics over MultiTS-Eval datasets using SaveManagers.
+Compute metrics over MUSEval datasets using SaveManagers.
 
 This module provides functionality to compute forecasting metrics
 over datasets using saved forecasts from SaveManagers.
@@ -11,9 +11,9 @@ import pandas as pd
 from typing import Dict, List, Optional, Iterator, Tuple
 from pathlib import Path
 
-from multieval.data import Benchmark
-from multieval.metrics import evaluate_metrics
-from examples.eval_multieval import SaveManager
+from museval.data import Benchmark
+from museval.metrics import evaluate_metrics
+from examples.eval_museval import SaveManager
 from examples.utils import _aggregate_metrics, _aggregate_results_by_level
 from examples.export_csvs import export_hierarchical_results_to_csv
 
@@ -271,7 +271,7 @@ def main():
     """Example usage of the compute_metrics_from_saved_forecasts function."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="Compute metrics from saved MultiTS-Eval forecasts")
+    parser = argparse.ArgumentParser(description="Compute metrics from saved MUSEval forecasts")
     parser.add_argument("--forecast-save-path", required=True, help="Path where forecasts were saved")
     parser.add_argument("--benchmark-path", required=True, help="Path to benchmark directory")
     parser.add_argument("--model-name", help="Name of a single model to process")

@@ -1,10 +1,10 @@
 """
-MultiTS-Eval Examples Package
+MUSEval Examples Package
 
-This package contains example scripts and utilities for running MultiTS-Eval benchmarks.
+This package contains example scripts and utilities for running MUSEval benchmarks.
 """
 
-from examples.run_multieval import (
+from examples.run_museval import (
     run_models_on_benchmark,
     compare_model_performance,
     generate_forecast_plots

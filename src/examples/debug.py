@@ -1,5 +1,5 @@
 """
-Debugging functionality for MultiTS-Eval examples.
+Debugging functionality for MUSEval examples.
 
 This module contains functions for:
 - NaN value tracking, reporting and statistics
@@ -9,7 +9,7 @@ This module contains functions for:
 
 import numpy as np
 from typing import Dict, Any, List, Optional, Set
-from multieval.plotting import plot_window_forecasts
+from museval.plotting import plot_window_forecasts
 
 
 def _initialize_nan_tracking() -> Dict[str, int]:
@@ -197,7 +197,7 @@ def create_individual_window(window, batch_idx: int):
     Returns:
         Window object containing only the specified batch item
     """
-    from multieval.data.window import Window
+    from museval.data.window import Window
     
     # Extract individual batch items
     individual_history = window.history()[batch_idx:batch_idx+1]  # Keep batch dimension

@@ -1,4 +1,4 @@
-# MultiTS-Eval: Multivariate Time Series Evaluation Dataset for Foundation Models
+# MUSEval: Multivariate Time Series Evaluation Dataset for Foundation Models
 
 A multivariate-first foundation model evaluation dataset that focuses on identifying a model's ability to leverage other useful time series for forecasting a single target time series. This codebase provides tooling and APIs for iterating through and evaluating metrics on the dataset, performing both univariate (just the target) and multivariate forecasting, and stratifying results according to each dataset, different domains (ex. energy, web, etc.) and different categories (synthetic, traditional, etc.).
 
@@ -10,19 +10,19 @@ Follow installation instructions here: [git-lfs](https://github.com/git-lfs/git-
 
 **Clone the dataset repo (requires git-lfs, ~100GB):**
 ```bash
-git clone git@hf.co:datasets/Synthefy/MultiTS-Eval ./multits-eval-data
+git clone git@hf.co:datasets/Synthefy/MUSEval ./museval-data
 ```
 
 **Create the directory structure and extract to target directory**
 ```bash
 # Create directory structure in shared memory for faster I/O
-mkdir -p <your target folder>/multits-eval-nested/{collections,traditional,sequential,synthetic}
+mkdir -p <your target folder>/museval-nested/{collections,traditional,sequential,synthetic}
 
 # Extract archives to shared memory
-tar -xzf ./multits-eval-data/compressed_data/collections.tar.gz -C <your target folder>/multits-eval-nested/collections &
-tar -xzf ./multits-eval-data/compressed_data/traditional.tar.gz -C <your target folder>/multits-eval-nested/traditional &
-tar -xzf ./multits-eval-data/compressed_data/sequential.tar.gz -C <your target folder>/multits-eval-nested/sequential &
-tar -xzf ./multits-eval-data/compressed_data/synthetic.tar.gz -C <your target folder>/multits-eval-nested/synthetic &
+tar -xzf ./museval-data/compressed_data/collections.tar.gz -C <your target folder>/museval-nested/collections &
+tar -xzf ./museval-data/compressed_data/traditional.tar.gz -C <your target folder>/museval-nested/traditional &
+tar -xzf ./museval-data/compressed_data/sequential.tar.gz -C <your target folder>/museval-nested/sequential &
+tar -xzf ./museval-data/compressed_data/synthetic.tar.gz -C <your target folder>/museval-nested/synthetic &
 ```
 
 ---
@@ -48,7 +48,7 @@ uv sync
 
 ```
 
-### Install MultiTS-Eval
+### Install MUSEval
 ```bash
 # Install in development mode
 uv pip install -e .
@@ -58,18 +58,18 @@ uv pip install -e .
 
 ### Running the Benchmark
 
-MultiTS-Eval provides two main evaluation scripts for different use cases:
+MUSEval provides two main evaluation scripts for different use cases:
 
-#### 1. `run_multieval.py` - Main Evaluation Script
+#### 1. `run_museval.py` - Main Evaluation Script
 
 The primary script for running baseline models with visualization and CSV export capabilities:
 
 ```bash
 # Run all models on all datasets with plots and CSV export and save exports
-uv run src/examples/run_multieval.py --benchmark-path <your target folder>/multits-eval-nested --models all --plots --load-cached-counts --output-dir <your target folder>/multits-eval-outputs/results --forecast-save-path <your target folder>/multits-eval-outputs/forecasts --batch-size 8
+uv run src/examples/run_museval.py --benchmark-path <your target folder>/museval-nested --models all --plots --load-cached-counts --output-dir <your target folder>/museval-outputs/results --forecast-save-path <your target folder>/museval-outputs/forecasts --batch-size 8
 
 # Debug mode (limited windows)
-uv run src/examples/run_multieval.py --benchmark-path <your target folder>/multits-eval-nested --models all --load-cached-counts --plots --output-dir <your target folder>/results --forecast-save-path <your target folder>/forecasts --windows 200 --debug-mode --batch-size 8
+uv run src/examples/run_museval.py --benchmark-path <your target folder>/museval-nested --models all --load-cached-counts --plots --output-dir <your target folder>/results --forecast-save-path <your target folder>/forecasts --windows 200 --debug-mode --batch-size 8
 ```
 
 **Key Arguments:**
@@ -78,13 +78,13 @@ uv run src/examples/run_multieval.py --benchmark-path <your target folder>/multi
 - Uses cached window counts for faster startup (`--load-cached-counts`)
 - Flexible filtering by categories, domains, and datasets
 
-#### 2. `eval_multieval.py` - Evaluation Script with Forecast Saving
+#### 2. `eval_museval.py` - Evaluation Script with Forecast Saving
 
 Specialized script for just forecast evaluation:
 
 ```bash
 # Use cached window counts for faster execution
-uv run src/examples/eval_multieval.py --benchmark-path <your target folder>multits-eval-nested --models all --load-cached-counts --output-dir <your target folder>/results
+uv run src/examples/eval_museval.py --benchmark-path <your target folder>museval-nested --models all --load-cached-counts --output-dir <your target folder>/results
 ```
 
 **Key Features:**
@@ -99,7 +99,7 @@ Both scripts support the following common arguments:
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `--benchmark-path` | Path to benchmark directory | `../multits_eval_data` |
+| `--benchmark-path` | Path to benchmark directory | `../museval_data` |
 | `--models` | Comma-separated list of models or 'all' | `mean,linear_trend` |
 | `--categories` | Filter by categories (e.g., 'traditional,synthetic') | All |
 | `--domains` | Filter by domains (e.g., 'Energy,Finance') | All |
@@ -110,14 +110,14 @@ Both scripts support the following common arguments:
 | `--stride` | Stride between windows | 256 |
 | `--load-cached-counts` | Use cached window counts | False |
 
-**run_multieval.py specific arguments:**
+**run_museval.py specific arguments:**
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--plots` | Generate forecast plots | False |
 | `--output-dir` | Output directory for plots/CSV | `/tmp` |
 | `--debug-mode` | Enable debug mode | False |
 
-**eval_multieval.py specific arguments:**
+**eval_museval.py specific arguments:**
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--forecast-save-path` | Path to save forecasts | `/tmp` |
@@ -127,15 +127,15 @@ Both scripts support the following common arguments:
 
 The above commands will only run the existing baselines. The dataset uses NaN padding for missing values, which should be handled by the custom model file. To use the tools in this repo to add your own model, you first need to create a model class with the desired features. Then using an instance of that class, there are three ways to add a new model, which we discuss below:
 - Add your model to the model_handling.py file
-- Utilize the functions in run_multieval.py to evaluate your model
+- Utilize the functions in run_museval.py to evaluate your model
 - Use the iterator to iterate through the dataset directly
 
 ### Creating A model Class
 ## Adding Custom Models
 ```python
-from examples.run_multieval import run_models_on_benchmark, compare_model_performance
+from examples.run_museval import run_models_on_benchmark, compare_model_performance
 from examples.utils import parse_models
-from multieval.baselines.base_forecaster import BaseForecaster
+from museval.baselines.base_forecaster import BaseForecaster
 import numpy as np
 from typing import Optional
 
@@ -171,7 +171,7 @@ class MyCustomModel(BaseForecaster):
 
 ### Usage pattern 1: Modify model_handling with your custom model
 
-Instead of modifying the `run_multieval.py` file, you can use the evaluation functions directly with your custom models by updating the models file in examples/model_handling.py:
+Instead of modifying the `run_museval.py` file, you can use the evaluation functions directly with your custom models by updating the models file in examples/model_handling.py:
 
 **Create model dictionary for evaluation**
 ```python
@@ -183,11 +183,11 @@ def get_custom_models():
 
 Then simply run 
 ```bash
-uv run src/examples/run_multieval.py --benchmark-path <YOUR PATH>/multits-eval-nested --models <MY_MODEL> --load-cached-counts --output-dir <your output path>/multits-eval-outputs/ --debug-mode --stride 512 --batch-size 32
+uv run src/examples/run_museval.py --benchmark-path <YOUR PATH>/museval-nested --models <MY_MODEL> --load-cached-counts --output-dir <your output path>/museval-outputs/ --debug-mode --stride 512 --batch-size 32
 ```
 
-### Usage Pattern 2: Use functions from run_multieval.py
-Using the function from run_multieval can give more fine-grain control, especially if you intend to change how the results are used or visualized.
+### Usage Pattern 2: Use functions from run_museval.py
+Using the function from run_museval can give more fine-grain control, especially if you intend to change how the results are used or visualized.
 
 ```python
 # Import functions from the examples package
@@ -200,7 +200,7 @@ from examples import (
 )
 
 # Configuration, modify to values appropriate for your model
-BENCHMARK_PATH = "<target path>multits-eval-nested/"  # Adjust this path to your MultiTS-Eval data
+BENCHMARK_PATH = "<target path>museval-nested/"  # Adjust this path to your MUSEval data
 MAX_WINDOWS = 3  # Limit windows per dataset for faster testing
 OUTPUT_DIR = ".<output target path>/<your model name>"
 BATCH_SIZE = 1
@@ -238,13 +238,13 @@ save_submission(results, OUTPUT_DIR, '<your model name>')
 Directly iterate on the dataset, which is especially useful when you want fine-grained manipulation of the data. 
 
 ```python
-from multieval.data import Benchmark
-from multieval.baselines.base_forecaster import BaseForecaster
+from museval.data import Benchmark
+from museval.baselines.base_forecaster import BaseForecaster
 import numpy as np
 from typing import Optional
 
 # Load benchmark data
-benchmark = Benchmark("<PATH TO DATA>/multits-eval-nested")
+benchmark = Benchmark("<PATH TO DATA>/museval-nested")
 
 # Create your custom model
 custom_model = MyCustomForecaster(param1=1.5, param2=2.0)
@@ -285,20 +285,20 @@ for category in benchmark:
 
 ## Example Notebooks
 
-MultiTS-Eval includes several Jupyter notebooks demonstrating different evaluation approaches:
+MUSEval includes several Jupyter notebooks demonstrating different evaluation approaches:
 
 ### 1. Baseline Models Evaluation
-**File:** [`notebooks/baseline_models_multieval_run_eval.ipynb`](notebooks/baseline_models_multieval_run_eval.ipynb)
+**File:** [`notebooks/baseline_models_museval_run_eval.ipynb`](notebooks/baseline_models_museval_run_eval.ipynb)
 
-### 2. Chronos Bolt Model Evaluation (using run_multieval)
-**File:** [`notebooks/chronos_bolt_multieval_run_eval.ipynb`](notebooks/chronos_bolt_multieval_run_eval.ipynb)
+### 2. Chronos Bolt Model Evaluation (using run_museval)
+**File:** [`notebooks/chronos_bolt_museval_run_eval.ipynb`](notebooks/chronos_bolt_museval_run_eval.ipynb)
 
 ### 3. Custom Chronos Evaluation (directly iterating on the dataset)
-**File:** [`notebooks/chronos_bolt_multieval_custom_eval.ipynb`](notebooks/chronos_bolt_multieval_custom_eval.ipynb)
+**File:** [`notebooks/chronos_bolt_museval_custom_eval.ipynb`](notebooks/chronos_bolt_museval_custom_eval.ipynb)
 
 ---
 
-### run_multieval Output Directory Structure
+### run_museval Output Directory Structure
 
 ```
 /tmp/results/
@@ -352,13 +352,13 @@ Submit data as a JSON array containing entries for each dataset with the followi
   - `NMAE`: Normalized Mean Absolute Error
 
 **Notes:**
-- The submission files are automatically generated by the `save_submission()` function (called by run_multieval.py)
+- The submission files are automatically generated by the `save_submission()` function (called by run_museval.py)
 - Files are saved as `{model_name}_submission.json` in the `submissions/` directory
-- Example files are provided in `src/examples/eval_multieval` and `src/examples/run_multieval`
+- Example files are provided in `src/examples/eval_museval` and `src/examples/run_museval`
 
 ## Internal Overview
 
-The `multits-eval` iterator provides iteration and evaluation utilities for the **MultiTS-Eval multivariate timeseries evaluation dataset**. Users download the dataset from Hugging Face as a `.tar.gz`, extract it, and then interact with it via this package.
+The `museval` iterator provides iteration and evaluation utilities for the **MUSEval multivariate timeseries evaluation dataset**. Users download the dataset from Hugging Face as a `.tar.gz`, extract it, and then interact with it via this package.
 
 ### Data Structure
 - **Benchmark** → container of multiple categories  
@@ -367,14 +367,14 @@ The `multits-eval` iterator provides iteration and evaluation utilities for the 
 - **Dataset** → contains multiple parquet files  
 - **Window** → extracted slices from parquet files  
 
-The breakdown of domains, categories and datasets can be found in `src/multits-eval/data/data_hierarchy.json`
+The breakdown of domains, categories and datasets can be found in `src/museval/data/data_hierarchy.json`
 
 ---
 
 ## Directory Layout
 ```
-MultiTS-Eval/
-├── src/multits-eval/              # Core MultiTS-eval package
+MUSEval/
+├── src/museval/              # Core MultiTS-eval package
 │   ├── data/                 # Data handling components
 │   │   ├── window.py         # Individual forecasting windows
 │   │   ├── dataset.py        # Dataset loading and windowing
@@ -396,16 +396,16 @@ MultiTS-Eval/
 │   └── plotting/             # Visualization utilities
 │       └── plot_forecasts.py
 ├── src/examples/             # Example scripts and utilities
-│   ├── run_multieval.py        # Main evaluation script
-│   ├── eval_multieval.py       # Evaluation script with forecast saving
+│   ├── run_museval.py        # Main evaluation script
+│   ├── eval_museval.py       # Evaluation script with forecast saving
 │   ├── utils.py              # Utility functions
 │   ├── debug.py              # Debug utilities
 │   ├── save_submission.py    # Saves out putputs in submission format
 │   └── export_csvs.py        # CSV export utilities
 ├── notebooks/                # Example usage Jupyter notebooks
-│   ├── baseline_models_multieval_run_eval.ipynb      # Baseline model evaluation
-│   ├── chronos_bolt_multieval_run_eval.ipynb         # Chronos Bolt model evaluation
-│   └── chronos_bolt_multieval_custom_eval.ipynb      # Custom Chronos evaluation
+│   ├── baseline_models_museval_run_eval.ipynb      # Baseline model evaluation
+│   ├── chronos_bolt_museval_run_eval.ipynb         # Chronos Bolt model evaluation
+│   └── chronos_bolt_museval_custom_eval.ipynb      # Custom Chronos evaluation
 ├── README.md                 # This file
 ├── pyproject.toml            # Project configuration
 └── setup.py                  # Package setup
@@ -502,7 +502,7 @@ Additional models ([toto](https://github.com/DataDog/toto), [timesfm](https://gi
 
 ## Metrics
 
-Defined in `src/multieval/metrics.py`:
+Defined in `src/museval/metrics.py`:
 - **MAPE** - Mean Absolute Percentage Error
 - **MAE** - Mean Absolute Error  
 - **RMSE** - Root Mean Square Error

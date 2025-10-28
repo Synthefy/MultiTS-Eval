@@ -3,13 +3,13 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "multieval"
+name = "museval"
 version = "1.0.0"
-description = "MultiTS-Eval: Multi-Scale Universal Synthetic Data for Forecasting Models"
+description = "MUSEval: Multivariate Time Series Evaluation Dataset for Foundation Models"
 readme = "README.md"
 license = { text = "Apache License 2.0" }
-authors = [{ name = "MultiTS-Eval Team", email = "contact@multieval.com" }]
-maintainers = [{ name = "MultiTS-Eval Team", email = "contact@multieval.com" }]
+authors = [{ name = "MUSEval Team", email = "caleb@synthefy.com" }]
+maintainers = [{ name = "MUSEval Team", email = "caleb@synthefy.com" }]
 keywords = ["forecasting", "time-series", "machine-learning", "benchmark"]
 classifiers = [
     "Development Status :: 4 - Beta",

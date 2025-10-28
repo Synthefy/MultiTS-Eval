@@ -1,6 +1,6 @@
-# MultiTS-Eval Submission Results
+# MUSEval Submission Results
 
-This directory contains submission results for the MultiTS-Eval multivariate time series forecasting benchmark. Each submission includes model metadata and evaluation results across multiple domains and datasets.
+This directory contains submission results for the MUSEval multivariate time series forecasting benchmark. Each submission includes model metadata and evaluation results across multiple domains and datasets.
 
 ## Submission Structure
 

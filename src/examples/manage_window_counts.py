@@ -10,7 +10,7 @@ import glob
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from multieval.data.benchmark import Benchmark
+from museval.data.benchmark import Benchmark
 
 
 def cleanup_window_counts(base_path: str = ""):
@@ -87,7 +87,7 @@ def load_window_counts_summary(base_path: str = "", load_cached: bool = False, h
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Manage window counts for MultiTS-Eval datasets")
+    parser = argparse.ArgumentParser(description="Manage window counts for MUSEval datasets")
     parser.add_argument("--action", choices=["save", "load", "both", "cleanup"], default="both")
     parser.add_argument("--base-path", default="")
     parser.add_argument("--cleanup-first", action="store_true", help="Clean up old window count files before saving")

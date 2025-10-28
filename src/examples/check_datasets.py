@@ -11,8 +11,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from multieval.data import Benchmark, Dataset
-from multieval.data.dataset import Dataset as DatasetClass
+from museval.data import Benchmark, Dataset
+from museval.data.dataset import Dataset as DatasetClass
 import json
 
 def check_datasets(benchmark_path: str):
@@ -22,7 +22,7 @@ def check_datasets(benchmark_path: str):
     print("=" * 80)
     
     # Load the dataset config
-    config_path = Path(__file__).parent.parent / "src/multieval/data/dataset_config.json"
+    config_path = Path(__file__).parent.parent / "src/museval/data/dataset_config.json"
     with open(config_path, 'r') as f:
         config = json.load(f)
     

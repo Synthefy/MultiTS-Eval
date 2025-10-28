@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="multieval",
+    name="museval",
     version="1.0.0",
-    description="MultiTS-Eval: Multivariate Time Series Evaluation Dataset for Foundation Models",
+    description="MUSEval: Multivariate Time Series Evaluation Dataset for Foundation Models",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.9",
