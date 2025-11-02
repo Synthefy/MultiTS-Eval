@@ -288,14 +288,13 @@ for category in benchmark:
 MUSEval includes several Jupyter notebooks demonstrating different evaluation approaches:
 
 ### 1. Baseline Models Evaluation
-**File:** [`notebooks/baseline_models_museval_run_eval.ipynb`](notebooks/baseline_models_museval_run_eval.ipynb)
+**File:** [`notebooks/baseline_models_museval_run_eval.ipynb`](https://github.com/Synthefy/MUSEval/blob/ocean-synthefy-patch-1/notebooks/baseline_models_museval_run_eval.ipynb)
 
 ### 2. Chronos Bolt Model Evaluation (using run_museval)
-**File:** [`notebooks/chronos_bolt_museval_run_eval.ipynb`](notebooks/chronos_bolt_museval_run_eval.ipynb)
+**File:** [`notebooks/chronos_bolt_museval_run_eval.ipynb`](https://github.com/Synthefy/MUSEval/blob/ocean-synthefy-patch-1/notebooks/chronos_bolt_museval_custom_eval.ipynb)
 
 ### 3. Custom Chronos Evaluation (directly iterating on the dataset)
-**File:** [`notebooks/chronos_bolt_museval_custom_eval.ipynb`](notebooks/chronos_bolt_museval_custom_eval.ipynb)
-
+**File:** [`notebooks/chronos_bolt_museval_custom_eval.ipynb`](https://github.com/Synthefy/MUSEval/blob/ocean-synthefy-patch-1/notebooks/chronos_bolt_museval_run_eval.ipynb)
 ---
 
 ### run_museval Output Directory Structure
