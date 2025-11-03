@@ -1,5 +1,8 @@
 # MUSEval: Multivariate Time Series Evaluation Dataset for Foundation Models
 
+[![huggingface](https://img.shields.io/badge/%F0%9F%A4%97%20HF-MUSEval_Dataset-FFD21E)](https://huggingface.co/datasets/Synthefy/MUSEval)
+[![leaderboard](https://img.shields.io/badge/%F0%9F%8F%86%20MUSEval-Leaderboard-0078D4)](https://huggingface.co/spaces/Synthefy/MUSEval)
+
 A multivariate-first foundation model evaluation dataset that focuses on identifying a model's ability to leverage other useful time series for forecasting a single target time series. This codebase provides tooling and APIs for iterating through and evaluating metrics on the dataset, performing both univariate (just the target) and multivariate forecasting, and stratifying results according to each dataset, different domains (ex. energy, web, etc.) and different categories (synthetic, traditional, etc.).
 
 # Usage
@@ -8,7 +11,7 @@ A multivariate-first foundation model evaluation dataset that focuses on identif
 **Install git-lfs if not preset**
 Follow installation instructions here: [git-lfs](https://github.com/git-lfs/git-lfs?utm_source=gitlfs_site&utm_medium=installation_link&utm_campaign=gitlfs#installing)
 
-**Clone the dataset repo (requires git-lfs, ~100GB):**
+**Clone the [dataset](https://huggingface.co/datasets/Synthefy/MUSEval) repo (requires git-lfs, ~100GB):**
 ```bash
 git clone git@hf.co:datasets/Synthefy/MUSEval ./museval-data
 ```
@@ -319,7 +322,7 @@ MUSEval includes several Jupyter notebooks demonstrating different evaluation ap
 
 # Make a submission
 
-Submit data as a JSON array containing entries for each dataset with the following format:
+Submit data for our [leaderboard](https://huggingface.co/spaces/Synthefy/MUSEval) as a JSON array containing entries for each dataset with the following format:
 
 ```json
 [
