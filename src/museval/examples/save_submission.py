@@ -39,7 +39,7 @@ def save_submission(results: Dict[str, Any], output_dir: str, model_name: Option
     """
     
     # Load the data hierarchy to get domain and category mappings
-    hierarchy_path = Path(__file__).parent.parent / "museval" / "data" / "data_hierarchy.json"
+    hierarchy_path = Path(__file__).parent.parent / "data" / "data_hierarchy.json"
     with open(hierarchy_path, 'r') as f:
         data_hierarchy = json.load(f)
     
