@@ -1,0 +1,187 @@
+{
+    "domains": [
+      {
+        "dataset_name": [
+          "large_convlag_synin_s",
+          "medium_convlag_synin_s",
+          "medium_obslag_synin_s",
+          "tiny_convlag_synin_ns",
+          "tiny_obslag_synin_ns",
+          "simple_synthetic"
+        ],
+        "domain": "Causal Model",
+        "category": "synthetic"
+      },
+      {
+        "dataset_name": [
+          "dynamic_data_csvs"
+        ],
+        "domain": "Dynamic",
+        "category": "synthetic"
+      },
+      {
+        "dataset_name": [
+          "al_daily",
+          "aus_electricity_nsw",
+          "aus_electricity_qld",
+          "az_daily",
+          "az_electricity",
+          "cal_daily",
+          "cal_electricity",
+          "car_daily",
+          "car_electricity",
+          "central_electricity",
+          "co_daily",
+          "eastern_electricity",
+          "ecl",
+          "ercot_load",
+          "fl_electricity",
+          "id_electricity",
+          "mds_microgrid",
+          "ne_daily",
+          "ne_electricity",
+          "nm_daily",
+          "northern_electricity",
+          "ny_daily",
+          "ny_electricity2025",
+          "or_electricity",
+          "pa_daily",
+          "pa_electricity",
+          "se_electricity",
+          "solar_alabama",
+          "southern_electricity",
+          "tn_daily",
+          "tn_electricity",
+          "tx_daily",
+          "tx_electricity",
+          "western_electricity"
+        ],
+        "domain": "Energy",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "ev-sensors",
+          "voip"
+        ],
+        "domain": "Engineering",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "beijing_aq",
+          "beijing_embassy",
+          "causalrivers",
+          "gas_sensor",
+          "oikolab_weather",
+          "open_aq",
+          "weather_mpi"
+        ],
+        "domain": "Environment",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "fred_md1",
+          "fred_md2",
+          "fred_md3",
+          "fred_md4",
+          "fred_md5",
+          "fred_md6",
+          "fred_md7",
+          "fred_md8"
+        ],
+        "domain": "Finance",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "cgm",
+          "sleep_lab"
+        ],
+        "domain": "Health",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "cifar100_timeseries_csvs"
+        ],
+        "domain": "Image",
+        "category": "sequential"
+      },
+      {
+        "dataset_name": [
+          "austin_water",
+          "blue_bikes",
+          "cursor-tabs",
+          "mn_interstate",
+          "mta_ridership",
+          "paris_mobility",
+          "lyft",
+          "uber",
+          "tac",
+          "traffic_PeMS"
+        ],
+        "domain": "Public Info",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "bitcoin_price",
+          "blow_molding",
+          "gold_prices",
+          "pasta_sales",
+          "rice_prices",
+          "walmart-sales"
+        ],
+        "domain": "Sales",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "ant_csv_out",
+          "hopper_csv_out",
+          "cheetah_csv_out",
+          "walker2d_csv_out",
+          "spriteworld"
+        ],
+        "domain": "Scientific",
+        "category": "sequential"
+      },
+      {
+        "dataset_name": [
+          "stock_nasdaqtrader"
+        ],
+        "domain": "Stock",
+        "category": "collections"
+      },
+      {
+        "dataset_name": [
+          "openwebtext_timeseries_csvs"
+        ],
+        "domain": "Text",
+        "category": "sequential"
+      },
+      {
+        "dataset_name": [
+          "KITTI"
+        ],
+        "domain": "Video",
+        "category": "sequential"
+      },
+      {
+        "dataset_name": [
+          "website_visitors"
+        ],
+        "domain": "Web",
+        "category": "traditional"
+      },
+      {
+        "dataset_name": [
+          "wikipedia"
+        ],
+        "domain": "Wikipedia",
+        "category": "collections"
+      }
+    ]
+  }

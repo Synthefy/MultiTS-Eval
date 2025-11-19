@@ -1,0 +1,56 @@
+{
+    "fred_md": [
+        "fred_md1",
+        "fred_md2",
+        "fred_md3",
+        "fred_md4",
+        "fred_md5",
+        "fred_md6",
+        "fred_md7",
+        "fred_md8"
+    ],
+    "daily_electricity": [
+        "al_daily",
+        "az_daily",
+        "cal_daily",
+        "car_daily",
+        "co_daily",
+        "ne_daily",
+        "nm_daily",
+        "ny_daily",
+        "pa_daily",
+        "tn_daily",
+        "tx_daily"
+    ],
+    "hourly_electricity": [
+        "az_electricity",
+        "id_electricity",
+        "pa_electricity",
+        "tx_electricity",
+        "cal_electricity",
+        "ne_electricity",
+        "se_electricity",
+        "car_electricity",
+        "or_electricity",
+        "tn_electricity"
+    ],
+    "rideshare": [
+        "lyft",
+        "uber"
+    ],
+    "europe_electricity": [
+        "central_electricity",
+        "eastern_electricity",
+        "northern_electricity",
+        "southern_electricity",
+        "western_electricity"
+    ],
+    "synthetic_scm": [
+        "large_convlag_synin_s",
+        "medium_convlag_synin_s",
+        "medium_obslag_synin_s",
+        "tiny_convlag_synin_ns",
+        "tiny_obslag_synin_ns",
+        "simple_synthetic"
+    ]
+}
